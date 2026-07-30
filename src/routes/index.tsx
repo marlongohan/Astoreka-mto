@@ -302,6 +302,7 @@ function Index() {
     jobId: "",
     scheduledAt: toDateKey(new Date()),
   });
+  const [quickActionMessage, setQuickActionMessage] = useState("");
   const [newJobError, setNewJobError] = useState("");
   const [newMaterial, setNewMaterial] = useState({
     name: "",
@@ -1410,7 +1411,11 @@ function Index() {
     }));
   };
 
-  const copyWhatsApp = async (jobId: string, type: "visita" | "presupuesto" | "cobro") => {
+  const copyWhatsApp = async (
+    jobId: string,
+    type: "visita" | "presupuesto" | "cobro",
+    openChat = false,
+  ) => {
     const job = data.jobs.find((entry) => entry.id === jobId);
     if (!job) {
       return;
@@ -1418,8 +1423,17 @@ function Index() {
     const client = job.clientId ? clientsById.get(job.clientId) : undefined;
     const text = getWhatsAppText(type, job, client);
     if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(text).catch(() => undefined);
     }
+    if (openChat && typeof window !== "undefined") {
+      const phone = client?.phone.replace(/\D/g, "");
+      if (phone) {
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+        setQuickActionMessage(`WhatsApp preparado para ${client?.name ?? job.code}.`);
+        return;
+      }
+    }
+    setQuickActionMessage(`Texto de WhatsApp copiado para ${client?.name ?? job.code}.`);
   };
 
   const escapeHtml = (value: string) =>
@@ -1537,35 +1551,102 @@ function Index() {
   const currentClient = selectedJob?.clientId ? clientsById.get(selectedJob.clientId) : undefined;
   const currentAsset = selectedJob?.assetId ? assetsById.get(selectedJob.assetId) : undefined;
   const currentInvoice = selectedJob ? invoicesByJob.get(selectedJob.id) : undefined;
+
+  const getSelectedOrFirstActiveJob = () =>
+    selectedJob ??
+    jobs.find((job) =>
+      ["nuevo", "asignado", "programado", "en_camino", "en_curso", "diagnosticado"].includes(
+        job.status,
+      ),
+    ) ??
+    jobs[0];
+
+  const getSelectedOrFirstContactableJob = () =>
+    selectedJob ??
+    jobs.find((job) => {
+      const client = job.clientId ? clientsById.get(job.clientId) : undefined;
+      return Boolean(client?.phone);
+    }) ??
+    jobs[0];
+
+  const getCollectionTargetJob = () => {
+    if (
+      selectedJob &&
+      (selectedJob.status === "facturado" ||
+        invoicesByJob.get(selectedJob.id)?.status === "emitida")
+    ) {
+      return selectedJob;
+    }
+
+    const pendingInvoice = data.invoices.find((invoice) => invoice.status !== "cobrada");
+    return pendingInvoice ? jobs.find((job) => job.id === pendingInvoice.jobId) : undefined;
+  };
+
+  const quickScheduleVisit = () => {
+    const job = getSelectedOrFirstActiveJob();
+    if (!job) {
+      setQuickActionMessage("Crea un aviso antes de programar una visita.");
+      setNewDialog("aviso");
+      return;
+    }
+    openScheduleDialog(job.id);
+    setQuickActionMessage(`Preparando cita para ${job.code}.`);
+  };
+
+  const quickWhatsApp = () => {
+    const job = getSelectedOrFirstContactableJob();
+    if (!job) {
+      setQuickActionMessage("Crea un aviso con cliente antes de preparar WhatsApp.");
+      setNewDialog("aviso");
+      return;
+    }
+    setSelectedJobId(job.id);
+    void copyWhatsApp(job.id, "visita", true);
+  };
+
+  const quickMarkCollected = () => {
+    const job = getCollectionTargetJob();
+    if (!job) {
+      setSection("facturas");
+      setQuickActionMessage("No hay facturas pendientes de cobro.");
+      return;
+    }
+    setSelectedJobId(job.id);
+    markCollected(job.id);
+    setSection("facturas");
+    setQuickActionMessage(`${job.code} marcado como cobrado.`);
+  };
+
   const quickActions = (
-    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-      <Button size="sm" onClick={() => setNewDialog("aviso")}>
-        <Plus />
-        Crear aviso
-      </Button>
-      <Button size="sm" variant="outline" onClick={() => setSection("agenda")}>
-        <CalendarDays />
-        Programar
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => selectedJobId && copyWhatsApp(selectedJobId, "visita")}
-        disabled={!selectedJobId}
-      >
-        <Copy />
-        WhatsApp
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => selectedJobId && markCollected(selectedJobId)}
-        disabled={!selectedJobId}
-      >
-        <Euro />
-        Cobrado
-      </Button>
-    </div>
+    <>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <Button
+          size="sm"
+          onClick={() => {
+            setNewDialog("aviso");
+            setQuickActionMessage("Creando aviso nuevo.");
+          }}
+        >
+          <Plus />
+          Crear aviso
+        </Button>
+        <Button size="sm" variant="outline" onClick={quickScheduleVisit}>
+          <CalendarDays />
+          Programar
+        </Button>
+        <Button size="sm" variant="outline" onClick={quickWhatsApp}>
+          <Copy />
+          WhatsApp
+        </Button>
+        <Button size="sm" variant="outline" onClick={quickMarkCollected}>
+          <Euro />
+          Cobrado
+        </Button>
+      </div>
+      {quickActionMessage ? (
+        <p className="mt-2 text-xs text-muted-foreground">{quickActionMessage}</p>
+      ) : null}
+    </>
   );
 
   return (
