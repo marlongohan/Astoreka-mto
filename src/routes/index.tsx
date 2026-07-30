@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BellRing,
   CalendarDays,
@@ -147,6 +147,7 @@ function Index() {
   const [statusFilter, setStatusFilter] = useState<WorkStatus | "todos">("todos");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedJobTab, setSelectedJobTab] = useState("resumen");
+  const diagnosisFieldRef = useRef<HTMLTextAreaElement>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudState, setCloudState] = useState<CloudSyncState>({
     status: isCloudConfigured() ? "signed-out" : "local",
@@ -311,6 +312,22 @@ function Index() {
     [jobs, selectedJobId],
   );
   const queuedN8nEvents = getQueuedN8nEvents().length;
+
+  const focusDiagnosisField = () => {
+    setSelectedJobTab("resumen");
+
+    const focusField = () => {
+      diagnosisFieldRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      diagnosisFieldRef.current?.focus({ preventScroll: true });
+    };
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.requestAnimationFrame(focusField);
+    window.setTimeout(focusField, 120);
+  };
 
   const kpis = useMemo(() => {
     const openStatuses: WorkStatus[] = [
@@ -2276,11 +2293,7 @@ function Index() {
                       >
                         Iniciar trabajo
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedJobTab("resumen")}
-                      >
+                      <Button size="sm" variant="outline" onClick={focusDiagnosisField}>
                         Añadir diagnóstico
                       </Button>
                       <Button
@@ -2471,8 +2484,10 @@ function Index() {
                             </div>
                           </div>
                         </div>
-                        <Label>Diagnóstico</Label>
+                        <Label htmlFor="job-diagnosis">Diagnóstico</Label>
                         <Textarea
+                          id="job-diagnosis"
+                          ref={diagnosisFieldRef}
                           value={selectedJob.diagnosis}
                           onChange={(event) =>
                             updateJobDetails(selectedJob.id, { diagnosis: event.target.value })
