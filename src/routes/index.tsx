@@ -125,7 +125,7 @@ const MOBILE_PRIMARY_SECTIONS: MainSection[] = ["inicio", "trabajos", "agenda"];
 const MOBILE_COMPACT_LABELS: Partial<Record<MainSection, string>> = {
   inicio: "Inicio",
 };
-const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-cropped.jpg";
+const ASTOREKA_LOGO_SRC = "/brand/astoreka-oak-logo.jpg";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
@@ -1460,11 +1460,14 @@ function Index() {
   <title>${escapeHtml(title)}</title>
   <style>
     body { font-family: Inter, Arial, sans-serif; color: #18252b; margin: 40px; line-height: 1.45; }
+    .document-actions { display: flex; gap: 10px; margin-bottom: 24px; }
+    button { border: 1px solid #0f766e; border-radius: 6px; background: #0f766e; color: #fff; cursor: pointer; font: inherit; padding: 9px 13px; }
+    button.secondary { background: #fff; color: #0f766e; }
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
     h1 { margin: 0; font-size: 28px; }
     h2 { margin: 26px 0 10px; font-size: 16px; }
     .brand { display: flex; align-items: center; gap: 18px; }
-    .brand-logo { width: 150px; height: auto; display: block; }
+    .brand-logo { width: 92px; height: auto; display: block; }
     .muted { color: #5f6f75; }
     .box { border: 1px solid #d7e2e4; border-radius: 8px; padding: 14px; margin: 12px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -1473,11 +1476,14 @@ function Index() {
     .totals { margin-left: auto; width: 320px; }
     .totals div { display: flex; justify-content: space-between; padding: 6px 0; }
     .total { font-size: 20px; font-weight: 700; color: #0f766e; }
-    @media print { button { display: none; } body { margin: 24px; } }
+    @media print { .document-actions { display: none; } body { margin: 24px; } }
   </style>
 </head>
 <body>
-  <button onclick="window.print()">Imprimir / guardar PDF</button>
+  <div class="document-actions">
+    <button class="secondary" onclick="window.opener?.focus(); window.close(); history.back()">Volver a la app</button>
+    <button onclick="window.print()">Imprimir / guardar PDF</button>
+  </div>
   <header>
     <div class="brand">
       <img class="brand-logo" src="${ASTOREKA_LOGO_SRC}" alt="Astoreka" />
