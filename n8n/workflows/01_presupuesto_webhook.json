@@ -1,0 +1,81 @@
+{
+  "name": "Astoreka MTO - Crear presupuesto",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "astoreka/presupuesto",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-presupuesto",
+      "name": "Webhook presupuesto",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "webhookId": "f68ddbc9-1a99-4627-87b2-2ebccb513a5c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst vatRate = body.vatRate ?? 0.21;\nconst rates = { callOutLocal: 25, callOutExtended: 40, hourStandard: 30, hourUrgent: 45, minimumJob: 45, kmRate: 0.35, ...(body.rates || {}) };\nconst hours = Number(body.hours || 1);\nconst distanceKm = Number(body.distanceKm || 0);\nconst urgent = Boolean(body.urgent);\nconst labor = Math.max(hours * (urgent ? rates.hourUrgent : rates.hourStandard), rates.minimumJob);\nconst callOut = distanceKm > 15 ? rates.callOutExtended : rates.callOutLocal;\nconst kmCost = Math.max(distanceKm - 10, 0) * rates.kmRate;\nconst materials = Array.isArray(body.materials) ? body.materials : [];\nconst materialsSale = materials.reduce((sum, item) => sum + Number(item.salePrice || 0) * Number(item.qty || 0), 0);\nconst subtotal = labor + callOut + kmCost + materialsSale;\nconst vat = subtotal * vatRate;\nconst total = subtotal + vat;\nconst rows = [['Salida / diagnostico', 1, callOut], ['Mano de obra', hours, labor], ...(kmCost > 0 ? [['Kilometraje adicional', distanceKm, kmCost]] : []), ...materials.map(item => [item.name || item.id || 'Material', item.qty || 1, Number(item.salePrice || 0) * Number(item.qty || 0)])];\nconst htmlRows = rows.map(row => '<tr><td>' + row[0] + '</td><td>' + row[1] + '</td><td style=\"text-align:right\">' + row[2].toFixed(2) + ' EUR</td></tr>').join('');\nconst html = '<!doctype html><html><head><meta charset=\"utf-8\"><title>Presupuesto Astoreka MTO</title><style>body{font-family:Arial;margin:32px;color:#1f2933}header{border-bottom:3px solid #075b63;margin-bottom:20px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #d8e0e7;padding:8px}th{text-align:left}.total{font-size:20px}</style></head><body><header><h1>Astoreka MTO</h1><p>Presupuesto</p></header><p><strong>Cliente:</strong> ' + (body.clientName || 'Cliente pendiente') + '</p><p><strong>Trabajo:</strong> ' + (body.description || '') + '</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Importe</th></tr></thead><tbody>' + htmlRows + '</tbody></table><p>Subtotal: ' + subtotal.toFixed(2) + ' EUR</p><p>IVA: ' + vat.toFixed(2) + ' EUR</p><p class=\"total\"><strong>Total: ' + total.toFixed(2) + ' EUR</strong></p></body></html>';\nreturn [{ json: { type: 'presupuesto', clientName: body.clientName, subtotal, vat, total, html, status: 'generated' } }];"
+      },
+      "id": "code-calcular-presupuesto",
+      "name": "Calcular presupuesto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "id": "respond-presupuesto",
+      "name": "Responder presupuesto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook presupuesto": {
+      "main": [
+        [
+          {
+            "node": "Calcular presupuesto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular presupuesto": {
+      "main": [
+        [
+          {
+            "node": "Responder presupuesto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "astoreka-mto-presupuesto-v1"
+}

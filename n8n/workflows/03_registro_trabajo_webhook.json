@@ -1,0 +1,81 @@
+{
+  "name": "Astoreka MTO - Registrar trabajo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "astoreka/trabajo",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-trabajo",
+      "name": "Webhook trabajo",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "webhookId": "fb416409-4de8-4edc-adf0-36cc8ea90627"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst now = new Date().toISOString();\nconst required = ['clientName', 'description'];\nconst missing = required.filter(key => !body[key]);\nif (missing.length) {\n  return [{ json: { ok: false, status: 'missing_required_fields', missing } }];\n}\nconst job = {\n  id: body.id || ('JOB-' + String(Date.now()).slice(-6)),\n  createdAt: now,\n  clientName: body.clientName,\n  clientType: body.clientType || 'particular',\n  phone: body.phone || '',\n  zone: body.zone || '',\n  description: body.description,\n  status: body.status || 'nuevo',\n  priority: body.priority || 'normal',\n  estimatedHours: Number(body.estimatedHours || 1),\n  notes: body.notes || ''\n};\nreturn [{ json: { ok: true, job } }];"
+      },
+      "id": "code-normalizar-trabajo",
+      "name": "Normalizar trabajo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "id": "respond-trabajo",
+      "name": "Responder trabajo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook trabajo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar trabajo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar trabajo": {
+      "main": [
+        [
+          {
+            "node": "Responder trabajo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "astoreka-mto-trabajo-v1"
+}

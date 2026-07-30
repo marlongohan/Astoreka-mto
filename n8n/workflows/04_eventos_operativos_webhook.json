@@ -1,0 +1,81 @@
+{
+  "name": "Astoreka MTO - Eventos operativos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "astoreka/evento",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-evento-astoreka",
+      "name": "Webhook evento Astoreka",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "webhookId": "4ed21408-7ada-48a0-ad7a-3bc0a41e7874"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst eventType = body.type || 'unknown';\nconst job = body.job || {};\nconst clients = body.appData?.clients || [];\nconst assets = body.appData?.assets || [];\nconst invoices = body.appData?.invoices || [];\nconst estimates = body.appData?.estimates || [];\nconst client = clients.find(item => item.id === job.clientId) || null;\nconst asset = assets.find(item => item.id === job.assetId) || null;\nconst invoice = invoices.find(item => item.jobId === job.id) || null;\nconst estimate = estimates.find(item => item.jobId === job.id) || null;\nconst nextAction = {\n  job_created: 'Registrar aviso y avisar a oficina si es urgente',\n  estimate_created: 'Enviar presupuesto al cliente y programar seguimiento',\n  job_status_changed: 'Registrar cambio de estado en historial externo',\n  invoice_created: 'Programar seguimiento de cobro',\n  invoice_collected: 'Cerrar cobro y actualizar resumen diario'\n}[eventType] || 'Revisar evento manualmente';\nreturn [{ json: { ok: true, eventType, receivedAt: new Date().toISOString(), job: { id: job.id, code: job.code, status: job.status, priority: job.priority, symptoms: job.symptoms, total: job.totals?.total || 0 }, client, asset, invoice, estimate, nextAction } }];"
+      },
+      "id": "code-normalizar-evento",
+      "name": "Normalizar evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "id": "respond-evento-astoreka",
+      "name": "Responder evento",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook evento Astoreka": {
+      "main": [
+        [
+          {
+            "node": "Normalizar evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar evento": {
+      "main": [
+        [
+          {
+            "node": "Responder evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "astoreka-mto-eventos-operativos-v1"
+}

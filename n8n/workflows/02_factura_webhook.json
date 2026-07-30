@@ -1,0 +1,81 @@
+{
+  "name": "Astoreka MTO - Crear factura",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "astoreka/factura",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-factura",
+      "name": "Webhook factura",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "webhookId": "9c66584f-2547-45e8-b98a-7dc9e1547d4b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst invoiceNumber = body.invoiceNumber || ('AST-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-5));\nconst vatRate = body.vatRate ?? 0.21;\nconst lines = Array.isArray(body.lines) ? body.lines : [];\nconst subtotal = lines.reduce((sum, line) => sum + Number(line.qty || 1) * Number(line.unitPrice || 0), 0);\nconst vat = subtotal * vatRate;\nconst total = subtotal + vat;\nconst htmlRows = lines.map(line => '<tr><td>' + (line.description || 'Concepto') + '</td><td>' + (line.qty || 1) + '</td><td style=\"text-align:right\">' + Number(line.unitPrice || 0).toFixed(2) + ' EUR</td><td style=\"text-align:right\">' + (Number(line.qty || 1) * Number(line.unitPrice || 0)).toFixed(2) + ' EUR</td></tr>').join('');\nconst html = '<!doctype html><html><head><meta charset=\"utf-8\"><title>Factura ' + invoiceNumber + '</title><style>body{font-family:Arial;margin:32px;color:#1f2933}header{border-bottom:3px solid #075b63;margin-bottom:20px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #d8e0e7;padding:8px}th{text-align:left}.total{font-size:20px}</style></head><body><header><h1>Astoreka MTO</h1><p>Factura ' + invoiceNumber + '</p></header><p><strong>Cliente:</strong> ' + (body.clientName || 'Cliente pendiente') + '</p><p><strong>Direccion:</strong> ' + (body.clientAddress || '') + '</p><table><thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio</th><th>Total</th></tr></thead><tbody>' + htmlRows + '</tbody></table><p>Subtotal: ' + subtotal.toFixed(2) + ' EUR</p><p>IVA: ' + vat.toFixed(2) + ' EUR</p><p class=\"total\"><strong>Total: ' + total.toFixed(2) + ' EUR</strong></p></body></html>';\nreturn [{ json: { type: 'factura', invoiceNumber, clientName: body.clientName, subtotal, vat, total, html, status: 'generated' } }];"
+      },
+      "id": "code-calcular-factura",
+      "name": "Calcular factura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "id": "respond-factura",
+      "name": "Responder factura",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook factura": {
+      "main": [
+        [
+          {
+            "node": "Calcular factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular factura": {
+      "main": [
+        [
+          {
+            "node": "Responder factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "astoreka-mto-factura-v1"
+}
