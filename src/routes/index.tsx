@@ -120,6 +120,7 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "ajustes", label: "Ajustes", icon: Save },
 ];
 
+const NAV_ITEM_KEYS = NAV_ITEMS.map((item) => item.key);
 const MOBILE_PRIMARY_SECTIONS: MainSection[] = ["inicio", "trabajos", "agenda"];
 const MOBILE_COMPACT_LABELS: Partial<Record<MainSection, string>> = {
   inicio: "Inicio",
@@ -541,9 +542,14 @@ function Index() {
     setAgendaView(view);
   };
 
-  const openJobFromAgenda = (jobId: string) => {
+  const openJob = (jobId: string) => {
     setSelectedJobId(jobId);
-    setSection("trabajos");
+    setSelectedJobTab("resumen");
+    setSection("trabajo");
+  };
+
+  const openJobFromAgenda = (jobId: string) => {
+    openJob(jobId);
   };
 
   const getAgendaClientName = (job: (typeof jobs)[number]) =>
@@ -1501,7 +1507,8 @@ function Index() {
             <nav className="mt-4 space-y-1">
               {NAV_ITEMS.map((item) => {
                 const ActiveIcon = item.icon;
-                const active = section === item.key;
+                const active =
+                  section === item.key || (section === "trabajo" && item.key === "trabajos");
                 return (
                   <Button
                     key={item.key}
@@ -1647,7 +1654,8 @@ function Index() {
               {NAV_ITEMS.filter((item) => MOBILE_PRIMARY_SECTIONS.includes(item.key)).map(
                 (item) => {
                   const ActiveIcon = item.icon;
-                  const active = section === item.key;
+                  const active =
+                    section === item.key || (section === "trabajo" && item.key === "trabajos");
                   return (
                     <Button
                       key={item.key}
@@ -1668,7 +1676,11 @@ function Index() {
 
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <Select
-                value={MOBILE_PRIMARY_SECTIONS.includes(section) ? "more" : section}
+                value={
+                  MOBILE_PRIMARY_SECTIONS.includes(section) || !NAV_ITEM_KEYS.includes(section)
+                    ? "more"
+                    : section
+                }
                 onValueChange={(value) => {
                   if (value !== "more") {
                     setSection(value as MainSection);
@@ -2302,10 +2314,7 @@ function Index() {
                             variant="outline"
                             size="sm"
                             className="h-auto w-full min-w-0 justify-start rounded-sm bg-card p-2 text-left shadow-none"
-                            onClick={() => {
-                              setSelectedJobId(job.id);
-                              setSection("trabajos");
-                            }}
+                            onClick={() => openJob(job.id)}
                           >
                             <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
                               <span className="font-medium">{job.code}</span>
@@ -2351,7 +2360,7 @@ function Index() {
           )}
 
           {section === "trabajos" && (
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]">
+            <section className="grid gap-4">
               <Card className="min-w-0 overflow-hidden">
                 <CardHeader className="border-b bg-secondary/20">
                   <CardTitle>Trabajos</CardTitle>
@@ -2438,7 +2447,7 @@ function Index() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setSelectedJobId(job.id)}
+                                    onClick={() => openJob(job.id)}
                                   >
                                     Abrir
                                   </Button>
@@ -2491,15 +2500,34 @@ function Index() {
                   </div>
                 </CardContent>
               </Card>
+            </section>
+          )}
 
+          {section === "trabajo" && (
+            <section className="grid gap-4">
               <Card className="min-w-0 overflow-hidden xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
                 <CardHeader className="border-b bg-secondary/20">
-                  <CardTitle>Ficha de trabajo</CardTitle>
-                  <CardDescription>Resumen, acciones y edición rápida.</CardDescription>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle>Ficha de trabajo</CardTitle>
+                      <CardDescription>Resumen, acciones y edición rápida.</CardDescription>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setSection("trabajos")}>
+                      <ChevronLeft />
+                      Trabajos
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {!selectedJob ? (
-                    <p className="text-sm text-muted-foreground">Selecciona un trabajo.</p>
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Selecciona un trabajo desde la cola.
+                      </p>
+                      <Button size="sm" onClick={() => setSection("trabajos")}>
+                        Ver trabajos
+                      </Button>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       <div className="grid gap-2 rounded-md border bg-card p-3">

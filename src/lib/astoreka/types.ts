@@ -221,6 +221,7 @@ export interface AppData {
 export type MainSection =
   | "inicio"
   | "trabajos"
+  | "trabajo"
   | "agenda"
   | "clientes"
   | "equipos"
