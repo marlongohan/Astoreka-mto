@@ -99,6 +99,7 @@ import type {
   Client,
   Estimate,
   Invoice,
+  Job,
   JobMaterialLine,
   MainSection,
   Material,
@@ -162,6 +163,10 @@ function toDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getAgendaJobDateKey(job: Job) {
+  return job.scheduledAt || job.requestedAt || toDateKey(new Date());
 }
 
 function startOfLocalDay(date: Date) {
@@ -500,25 +505,19 @@ function Index() {
   const agendaMonthDays = useMemo(() => getMonthDays(agendaBaseDate), [agendaBaseDate]);
   const agendaJobs = useMemo(
     () =>
-      jobs
-        .filter((job) =>
-          ["asignado", "programado", "en_camino", "en_curso", "pendiente_pieza"].includes(
-            job.status,
-          ),
-        )
-        .sort((first, second) => {
-          const dateOrder = first.scheduledAt.localeCompare(second.scheduledAt);
-          if (dateOrder !== 0) {
-            return dateOrder;
-          }
-          return first.code.localeCompare(second.code);
-        }),
+      [...jobs].sort((first, second) => {
+        const dateOrder = getAgendaJobDateKey(first).localeCompare(getAgendaJobDateKey(second));
+        if (dateOrder !== 0) {
+          return dateOrder;
+        }
+        return first.code.localeCompare(second.code);
+      }),
     [jobs],
   );
   const agendaJobsByDate = useMemo(() => {
     const grouped = new Map<string, typeof agendaJobs>();
     agendaJobs.forEach((job) => {
-      const key = job.scheduledAt || toDateKey(new Date());
+      const key = getAgendaJobDateKey(job);
       grouped.set(key, [...(grouped.get(key) ?? []), job]);
     });
     return grouped;
@@ -528,14 +527,14 @@ function Index() {
   const agendaSelectedJobs = agendaJobsByDate.get(agendaSelectedKey) ?? [];
   const visibleAgendaJobs = useMemo(() => {
     if (agendaView === "dia" || agendaView === "horas") {
-      return agendaJobs.filter((job) => job.scheduledAt === agendaSelectedKey);
+      return agendaJobs.filter((job) => getAgendaJobDateKey(job) === agendaSelectedKey);
     }
 
     const visibleKeys =
       agendaView === "semana"
         ? new Set(agendaWeekDays.map(toDateKey))
         : new Set(agendaMonthDays.map(toDateKey));
-    return agendaJobs.filter((job) => visibleKeys.has(job.scheduledAt));
+    return agendaJobs.filter((job) => visibleKeys.has(getAgendaJobDateKey(job)));
   }, [agendaJobs, agendaMonthDays, agendaSelectedKey, agendaView, agendaWeekDays]);
 
   const shiftAgendaDate = (direction: -1 | 1) => {
@@ -3168,7 +3167,7 @@ function Index() {
                   <div>
                     <CardTitle>Agenda</CardTitle>
                     <CardDescription>
-                      Calendario operativo por fecha, técnico y estado de visita.
+                      Registro operativo por fecha, técnico y estado del aviso.
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -3298,7 +3297,7 @@ function Index() {
                                   className="flex h-24 w-full items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
                                   onClick={() => openAgendaDay(dateKey)}
                                 >
-                                  Sin visitas
+                                  Sin avisos
                                 </button>
                               ) : (
                                 dayJobs.map((job) => (
@@ -3394,10 +3393,10 @@ function Index() {
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-secondary/25 p-3">
                       <div>
                         <p className="text-sm font-semibold">
-                          {agendaSelectedJobs.length} visitas en el día
+                          {agendaSelectedJobs.length} avisos en el día
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Sin hora exacta todavía: se muestran como eventos del día.
+                          Si no tienen hora exacta todavía, se muestran como eventos del día.
                         </p>
                       </div>
                       <Button variant="outline" onClick={() => setAgendaView("horas")}>
@@ -3407,7 +3406,7 @@ function Index() {
 
                     {agendaSelectedJobs.length === 0 ? (
                       <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                        No hay visitas en este día.
+                        No hay avisos en este día.
                       </div>
                     ) : (
                       <div className="grid gap-2 lg:grid-cols-2">
@@ -3466,7 +3465,7 @@ function Index() {
                           Hora
                         </div>
                         <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
-                          Visitas
+                          Avisos
                         </div>
                       </div>
                       {agendaSelectedJobs.length > 0 ? (
