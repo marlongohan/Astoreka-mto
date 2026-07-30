@@ -118,6 +118,11 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "ajustes", label: "Ajustes", icon: Save },
 ];
 
+const MOBILE_PRIMARY_SECTIONS: MainSection[] = ["inicio", "trabajos", "agenda"];
+const MOBILE_COMPACT_LABELS: Partial<Record<MainSection, string>> = {
+  inicio: "Inicio",
+};
+
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
   nuevo: "border-blue-300 bg-blue-50 text-blue-800",
@@ -1477,577 +1482,612 @@ function Index() {
             </section>
           ) : null}
 
-          <section className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-            {NAV_ITEMS.map((item) => {
-              const ActiveIcon = item.icon;
-              const active = section === item.key;
-              return (
-                <Button
-                  key={item.key}
-                  variant={active ? "default" : "outline"}
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => setSection(item.key)}
-                >
-                  <ActiveIcon />
-                  {item.label}
-                </Button>
-              );
-            })}
+          <section className="grid gap-2 lg:hidden">
+            <div className="grid grid-cols-3 gap-2">
+              {NAV_ITEMS.filter((item) => MOBILE_PRIMARY_SECTIONS.includes(item.key)).map(
+                (item) => {
+                  const ActiveIcon = item.icon;
+                  const active = section === item.key;
+                  return (
+                    <Button
+                      key={item.key}
+                      variant={active ? "default" : "outline"}
+                      size="sm"
+                      className="min-w-0 px-2"
+                      onClick={() => setSection(item.key)}
+                    >
+                      <ActiveIcon />
+                      <span className="truncate">
+                        {MOBILE_COMPACT_LABELS[item.key] ?? item.label}
+                      </span>
+                    </Button>
+                  );
+                },
+              )}
+            </div>
 
-            <Dialog
-              open={newDialog !== ""}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setNewDialog("");
-                  setNewJobError("");
-                }
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  className="ml-auto shrink-0"
-                  onClick={() => setNewDialog("aviso")}
-                >
-                  <Plus />
-                  Nuevo
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Nuevo</DialogTitle>
-                  <DialogDescription>
-                    Crear aviso, trabajo, cliente, equipo, presupuesto, cita o material.
-                  </DialogDescription>
-                </DialogHeader>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Select
+                value={MOBILE_PRIMARY_SECTIONS.includes(section) ? "more" : section}
+                onValueChange={(value) => {
+                  if (value !== "more") {
+                    setSection(value as MainSection);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 min-w-0">
+                  {MOBILE_PRIMARY_SECTIONS.includes(section) ? (
+                    <span>Más secciones</span>
+                  ) : (
+                    <SelectValue />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="more">Más secciones</SelectItem>
+                  {NAV_ITEMS.filter((item) => !MOBILE_PRIMARY_SECTIONS.includes(item.key)).map(
+                    (item) => (
+                      <SelectItem key={item.key} value={item.key}>
+                        {item.label}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
 
-                <Tabs
-                  value={newDialog || "aviso"}
-                  onValueChange={(value) => setNewDialog(value as typeof newDialog)}
-                >
-                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-transparent p-0 sm:grid-cols-6">
-                    <TabsTrigger value="aviso">Aviso</TabsTrigger>
-                    <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
-                    <TabsTrigger value="cliente">Cliente</TabsTrigger>
-                    <TabsTrigger value="equipo">Equipo</TabsTrigger>
-                    <TabsTrigger value="material">Material</TabsTrigger>
-                    <TabsTrigger value="cita">Cita</TabsTrigger>
-                  </TabsList>
+              <Dialog
+                open={newDialog !== ""}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setNewDialog("");
+                    setNewJobError("");
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="ml-auto shrink-0"
+                    onClick={() => setNewDialog("aviso")}
+                  >
+                    <Plus />
+                    Nuevo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Nuevo</DialogTitle>
+                    <DialogDescription>
+                      Crear aviso, trabajo, cliente, equipo, presupuesto, cita o material.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                  <TabsContent value="aviso" className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Entrada rápida sin importe. Sirve para llamadas, WhatsApp o avisos desde
-                      Telegram.
-                    </p>
-                    {newJobError ? (
-                      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-                        {newJobError}
+                  <Tabs
+                    value={newDialog || "aviso"}
+                    onValueChange={(value) => setNewDialog(value as typeof newDialog)}
+                  >
+                    <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-transparent p-0 sm:grid-cols-6">
+                      <TabsTrigger value="aviso">Aviso</TabsTrigger>
+                      <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
+                      <TabsTrigger value="cliente">Cliente</TabsTrigger>
+                      <TabsTrigger value="equipo">Equipo</TabsTrigger>
+                      <TabsTrigger value="material">Material</TabsTrigger>
+                      <TabsTrigger value="cita">Cita</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="aviso" className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Entrada rápida sin importe. Sirve para llamadas, WhatsApp o avisos desde
+                        Telegram.
+                      </p>
+                      {newJobError ? (
+                        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                          {newJobError}
+                        </div>
+                      ) : null}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Síntoma *</Label>
+                          <Input
+                            required
+                            value={newJob.symptoms}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cliente *</Label>
+                          <Select
+                            value={newJob.clientId}
+                            onValueChange={(value) =>
+                              setNewJob((prev) => ({ ...prev, clientId: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {data.clients.map((client) => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Dirección *</Label>
+                          <Input
+                            required
+                            value={newJob.address}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, address: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Técnico *</Label>
+                          <Input
+                            required
+                            value={newJob.technician}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, technician: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Prioridad</Label>
+                          <Select
+                            value={newJob.priority}
+                            onValueChange={(value) =>
+                              setNewJob((prev) => ({ ...prev, priority: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="baja">Baja</SelectItem>
+                              <SelectItem value="media">Media</SelectItem>
+                              <SelectItem value="alta">Alta</SelectItem>
+                              <SelectItem value="urgente">Urgente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Horas estimadas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={newJob.estimatedHours}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, estimatedHours: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Distancia (km)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={newJob.distanceKm}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, distanceKm: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Descripción inicial *</Label>
+                          <Textarea
+                            required
+                            value={newJob.description}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, description: event.target.value }))
+                            }
+                          />
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Síntoma *</Label>
-                        <Input
-                          required
-                          value={newJob.symptoms}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
-                          }
-                        />
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={() => createJob("aviso")}>Crear aviso</Button>
+                      </DialogFooter>
+                    </TabsContent>
+
+                    <TabsContent value="presupuesto" className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Crea trabajo presupuestado con mano de obra, salida, kilómetros, IVA y PDF.
+                      </p>
+                      {newJobError ? (
+                        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                          {newJobError}
+                        </div>
+                      ) : null}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Síntoma / trabajo *</Label>
+                          <Input
+                            required
+                            value={newJob.symptoms}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cliente *</Label>
+                          <Select
+                            value={newJob.clientId}
+                            onValueChange={(value) =>
+                              setNewJob((prev) => ({ ...prev, clientId: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {data.clients.map((client) => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Dirección *</Label>
+                          <Input
+                            required
+                            value={newJob.address}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, address: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Horas estimadas *</Label>
+                          <Input
+                            required
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={newJob.estimatedHours}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, estimatedHours: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Distancia (km)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={newJob.distanceKm}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, distanceKm: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Técnico *</Label>
+                          <Input
+                            required
+                            value={newJob.technician}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, technician: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Prioridad</Label>
+                          <Select
+                            value={newJob.priority}
+                            onValueChange={(value) =>
+                              setNewJob((prev) => ({ ...prev, priority: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="baja">Baja</SelectItem>
+                              <SelectItem value="media">Media</SelectItem>
+                              <SelectItem value="alta">Alta</SelectItem>
+                              <SelectItem value="urgente">Urgente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Detalle para el cliente *</Label>
+                          <Textarea
+                            required
+                            value={newJob.description}
+                            onChange={(event) =>
+                              setNewJob((prev) => ({ ...prev, description: event.target.value }))
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Cliente *</Label>
-                        <Select
-                          value={newJob.clientId}
-                          onValueChange={(value) =>
-                            setNewJob((prev) => ({ ...prev, clientId: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {data.clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name}
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={() => createJob("presupuesto")}>Crear presupuesto</Button>
+                      </DialogFooter>
+                    </TabsContent>
+
+                    <TabsContent value="cliente" className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Nombre</Label>
+                          <Input
+                            value={newClient.name}
+                            onChange={(event) =>
+                              setNewClient((prev) => ({ ...prev, name: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Teléfono</Label>
+                          <Input
+                            value={newClient.phone}
+                            onChange={(event) =>
+                              setNewClient((prev) => ({ ...prev, phone: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Zona</Label>
+                          <Input
+                            value={newClient.zone}
+                            onChange={(event) =>
+                              setNewClient((prev) => ({ ...prev, zone: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Dirección principal</Label>
+                          <Input
+                            value={newClient.address}
+                            onChange={(event) =>
+                              setNewClient((prev) => ({ ...prev, address: event.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={createClient}>Crear cliente</Button>
+                      </DialogFooter>
+                    </TabsContent>
+
+                    <TabsContent value="equipo" className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Cliente propietario</Label>
+                          <Select
+                            value={newAsset.clientId}
+                            onValueChange={(value) =>
+                              setNewAsset((prev) => ({ ...prev, clientId: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {data.clients.map((client) => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Categoría</Label>
+                          <Select
+                            value={newAsset.category}
+                            onValueChange={(value) =>
+                              setNewAsset((prev) => ({ ...prev, category: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="lavadora">Lavadora</SelectItem>
+                              <SelectItem value="lavavajillas">Lavavajillas</SelectItem>
+                              <SelectItem value="secadora">Secadora</SelectItem>
+                              <SelectItem value="alumbrado">Alumbrado</SelectItem>
+                              <SelectItem value="mecanismo">Mecanismo</SelectItem>
+                              <SelectItem value="termo">Termo</SelectItem>
+                              <SelectItem value="caldera">Caldera</SelectItem>
+                              <SelectItem value="frigorifico">Frigorífico</SelectItem>
+                              <SelectItem value="instalacion_electrica">
+                                Instalación eléctrica
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                              <SelectItem value="otro">Otro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Nombre</Label>
+                          <Input
+                            value={newAsset.name}
+                            onChange={(event) =>
+                              setNewAsset((prev) => ({ ...prev, name: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Marca</Label>
+                          <Input
+                            value={newAsset.brand}
+                            onChange={(event) =>
+                              setNewAsset((prev) => ({ ...prev, brand: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Modelo</Label>
+                          <Input
+                            value={newAsset.model}
+                            onChange={(event) =>
+                              setNewAsset((prev) => ({ ...prev, model: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Número de serie</Label>
+                          <Input
+                            value={newAsset.serial}
+                            onChange={(event) =>
+                              setNewAsset((prev) => ({ ...prev, serial: event.target.value }))
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Dirección *</Label>
-                        <Input
-                          required
-                          value={newJob.address}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, address: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Técnico *</Label>
-                        <Input
-                          required
-                          value={newJob.technician}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, technician: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Prioridad</Label>
-                        <Select
-                          value={newJob.priority}
-                          onValueChange={(value) =>
-                            setNewJob((prev) => ({ ...prev, priority: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="baja">Baja</SelectItem>
-                            <SelectItem value="media">Media</SelectItem>
-                            <SelectItem value="alta">Alta</SelectItem>
-                            <SelectItem value="urgente">Urgente</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Horas estimadas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={newJob.estimatedHours}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, estimatedHours: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Distancia (km)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={newJob.distanceKm}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, distanceKm: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Descripción inicial *</Label>
-                        <Textarea
-                          required
-                          value={newJob.description}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, description: event.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setNewDialog("")}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={() => createJob("aviso")}>Crear aviso</Button>
-                    </DialogFooter>
-                  </TabsContent>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={createAsset}>Crear equipo</Button>
+                      </DialogFooter>
+                    </TabsContent>
 
-                  <TabsContent value="presupuesto" className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Crea trabajo presupuestado con mano de obra, salida, kilómetros, IVA y PDF.
-                    </p>
-                    {newJobError ? (
-                      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-                        {newJobError}
+                    <TabsContent value="material" className="space-y-2">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Material</Label>
+                          <Input
+                            value={newMaterial.name}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, name: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>SKU</Label>
+                          <Input
+                            value={newMaterial.sku}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, sku: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Proveedor</Label>
+                          <Input
+                            value={newMaterial.provider}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, provider: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cantidad</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={newMaterial.quantity}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, quantity: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mínimo</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={newMaterial.minimum}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, minimum: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Coste</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={newMaterial.cost}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, cost: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Venta</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={newMaterial.salePrice}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, salePrice: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Ubicación</Label>
+                          <Input
+                            value={newMaterial.location}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({ ...prev, location: event.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Compatibilidad</Label>
+                          <Input
+                            value={newMaterial.compatibility}
+                            onChange={(event) =>
+                              setNewMaterial((prev) => ({
+                                ...prev,
+                                compatibility: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Síntoma / trabajo *</Label>
-                        <Input
-                          required
-                          value={newJob.symptoms}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Cliente *</Label>
-                        <Select
-                          value={newJob.clientId}
-                          onValueChange={(value) =>
-                            setNewJob((prev) => ({ ...prev, clientId: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {data.clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Dirección *</Label>
-                        <Input
-                          required
-                          value={newJob.address}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, address: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Horas estimadas *</Label>
-                        <Input
-                          required
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={newJob.estimatedHours}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, estimatedHours: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Distancia (km)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={newJob.distanceKm}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, distanceKm: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Técnico *</Label>
-                        <Input
-                          required
-                          value={newJob.technician}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, technician: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Prioridad</Label>
-                        <Select
-                          value={newJob.priority}
-                          onValueChange={(value) =>
-                            setNewJob((prev) => ({ ...prev, priority: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="baja">Baja</SelectItem>
-                            <SelectItem value="media">Media</SelectItem>
-                            <SelectItem value="alta">Alta</SelectItem>
-                            <SelectItem value="urgente">Urgente</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Detalle para el cliente *</Label>
-                        <Textarea
-                          required
-                          value={newJob.description}
-                          onChange={(event) =>
-                            setNewJob((prev) => ({ ...prev, description: event.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setNewDialog("")}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={() => createJob("presupuesto")}>Crear presupuesto</Button>
-                    </DialogFooter>
-                  </TabsContent>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={createMaterial}>Crear material</Button>
+                      </DialogFooter>
+                    </TabsContent>
 
-                  <TabsContent value="cliente" className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Nombre</Label>
-                        <Input
-                          value={newClient.name}
-                          onChange={(event) =>
-                            setNewClient((prev) => ({ ...prev, name: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Teléfono</Label>
-                        <Input
-                          value={newClient.phone}
-                          onChange={(event) =>
-                            setNewClient((prev) => ({ ...prev, phone: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Zona</Label>
-                        <Input
-                          value={newClient.zone}
-                          onChange={(event) =>
-                            setNewClient((prev) => ({ ...prev, zone: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Dirección principal</Label>
-                        <Input
-                          value={newClient.address}
-                          onChange={(event) =>
-                            setNewClient((prev) => ({ ...prev, address: event.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setNewDialog("")}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={createClient}>Crear cliente</Button>
-                    </DialogFooter>
-                  </TabsContent>
-
-                  <TabsContent value="equipo" className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Cliente propietario</Label>
-                        <Select
-                          value={newAsset.clientId}
-                          onValueChange={(value) =>
-                            setNewAsset((prev) => ({ ...prev, clientId: value }))
-                          }
+                    <TabsContent value="cita" className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        La cita nace desde un trabajo existente. Entra en Trabajos, abre la ficha y
+                        pulsa Programar visita.
+                      </p>
+                      <DialogFooter>
+                        <Button
+                          onClick={() => {
+                            setNewDialog("");
+                            setSection("trabajos");
+                          }}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {data.clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Categoría</Label>
-                        <Select
-                          value={newAsset.category}
-                          onValueChange={(value) =>
-                            setNewAsset((prev) => ({ ...prev, category: value }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="lavadora">Lavadora</SelectItem>
-                            <SelectItem value="lavavajillas">Lavavajillas</SelectItem>
-                            <SelectItem value="secadora">Secadora</SelectItem>
-                            <SelectItem value="alumbrado">Alumbrado</SelectItem>
-                            <SelectItem value="mecanismo">Mecanismo</SelectItem>
-                            <SelectItem value="termo">Termo</SelectItem>
-                            <SelectItem value="caldera">Caldera</SelectItem>
-                            <SelectItem value="frigorifico">Frigorífico</SelectItem>
-                            <SelectItem value="instalacion_electrica">
-                              Instalación eléctrica
-                            </SelectItem>
-                            <SelectItem value="otro">Otro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Nombre</Label>
-                        <Input
-                          value={newAsset.name}
-                          onChange={(event) =>
-                            setNewAsset((prev) => ({ ...prev, name: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Marca</Label>
-                        <Input
-                          value={newAsset.brand}
-                          onChange={(event) =>
-                            setNewAsset((prev) => ({ ...prev, brand: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Modelo</Label>
-                        <Input
-                          value={newAsset.model}
-                          onChange={(event) =>
-                            setNewAsset((prev) => ({ ...prev, model: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Número de serie</Label>
-                        <Input
-                          value={newAsset.serial}
-                          onChange={(event) =>
-                            setNewAsset((prev) => ({ ...prev, serial: event.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setNewDialog("")}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={createAsset}>Crear equipo</Button>
-                    </DialogFooter>
-                  </TabsContent>
-
-                  <TabsContent value="material" className="space-y-2">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label>Material</Label>
-                        <Input
-                          value={newMaterial.name}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, name: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>SKU</Label>
-                        <Input
-                          value={newMaterial.sku}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, sku: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Proveedor</Label>
-                        <Input
-                          value={newMaterial.provider}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, provider: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Cantidad</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={newMaterial.quantity}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, quantity: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Mínimo</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={newMaterial.minimum}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, minimum: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Coste</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newMaterial.cost}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, cost: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Venta</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newMaterial.salePrice}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, salePrice: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Ubicación</Label>
-                        <Input
-                          value={newMaterial.location}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({ ...prev, location: event.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Compatibilidad</Label>
-                        <Input
-                          value={newMaterial.compatibility}
-                          onChange={(event) =>
-                            setNewMaterial((prev) => ({
-                              ...prev,
-                              compatibility: event.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setNewDialog("")}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={createMaterial}>Crear material</Button>
-                    </DialogFooter>
-                  </TabsContent>
-
-                  <TabsContent value="cita" className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      La cita nace desde un trabajo existente. Entra en Trabajos, abre la ficha y
-                      pulsa Programar visita.
-                    </p>
-                    <DialogFooter>
-                      <Button
-                        onClick={() => {
-                          setNewDialog("");
-                          setSection("trabajos");
-                        }}
-                      >
-                        Ir a trabajos
-                      </Button>
-                    </DialogFooter>
-                  </TabsContent>
-                </Tabs>
-              </DialogContent>
-            </Dialog>
+                          Ir a trabajos
+                        </Button>
+                      </DialogFooter>
+                    </TabsContent>
+                  </Tabs>
+                </DialogContent>
+              </Dialog>
+            </div>
           </section>
 
           {section === "inicio" && (
