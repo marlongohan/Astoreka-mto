@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BellRing,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Cloud,
   ClipboardCheck,
   Copy,
@@ -147,6 +149,65 @@ function formatStatusLabel(status: WorkStatus) {
   return status.replaceAll("_", " ");
 }
 
+type AgendaView = "semana" | "mes";
+
+const WEEKDAY_LABELS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
+const MONTH_WEEKDAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function getWeekStart(date: Date) {
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addDays(startOfLocalDay(date), mondayOffset);
+}
+
+function parseDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) {
+    return startOfLocalDay(new Date());
+  }
+  return new Date(year, month - 1, day);
+}
+
+function formatAgendaRange(date: Date, view: AgendaView) {
+  if (view === "mes") {
+    return new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(date);
+  }
+
+  const start = getWeekStart(date);
+  const end = addDays(start, 6);
+  const formatter = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" });
+  return `${formatter.format(start)} - ${formatter.format(end)}`;
+}
+
+function getMonthDays(date: Date) {
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const gridStart = getWeekStart(monthStart);
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -190,6 +251,8 @@ function Index() {
   const [newDialog, setNewDialog] = useState<
     "aviso" | "trabajo" | "cliente" | "equipo" | "presupuesto" | "cita" | "material" | ""
   >("");
+  const [agendaView, setAgendaView] = useState<AgendaView>("semana");
+  const [agendaDate, setAgendaDate] = useState(() => toDateKey(new Date()));
 
   const [newClient, setNewClient] = useState({
     name: "",
@@ -406,6 +469,47 @@ function Index() {
       incidencias: jobs.filter((job) => getWorkGroup(job.status) === "incidencias"),
     };
   }, [jobs]);
+
+  const agendaBaseDate = useMemo(() => parseDateKey(agendaDate), [agendaDate]);
+  const agendaWeekDays = useMemo(() => {
+    const start = getWeekStart(agendaBaseDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  }, [agendaBaseDate]);
+  const agendaMonthDays = useMemo(() => getMonthDays(agendaBaseDate), [agendaBaseDate]);
+  const agendaJobs = useMemo(
+    () =>
+      jobs
+        .filter((job) =>
+          ["asignado", "programado", "en_camino", "en_curso", "pendiente_pieza"].includes(
+            job.status,
+          ),
+        )
+        .sort((first, second) => {
+          const dateOrder = first.scheduledAt.localeCompare(second.scheduledAt);
+          if (dateOrder !== 0) {
+            return dateOrder;
+          }
+          return first.code.localeCompare(second.code);
+        }),
+    [jobs],
+  );
+  const agendaJobsByDate = useMemo(() => {
+    const grouped = new Map<string, typeof agendaJobs>();
+    agendaJobs.forEach((job) => {
+      const key = job.scheduledAt || toDateKey(new Date());
+      grouped.set(key, [...(grouped.get(key) ?? []), job]);
+    });
+    return grouped;
+  }, [agendaJobs]);
+  const agendaTodayKey = toDateKey(new Date());
+  const agendaSelectedKey = toDateKey(agendaBaseDate);
+  const visibleAgendaJobs = useMemo(() => {
+    const visibleKeys =
+      agendaView === "semana"
+        ? new Set(agendaWeekDays.map(toDateKey))
+        : new Set(agendaMonthDays.map(toDateKey));
+    return agendaJobs.filter((job) => visibleKeys.has(job.scheduledAt));
+  }, [agendaJobs, agendaMonthDays, agendaView, agendaWeekDays]);
 
   const needsAttention = useMemo(() => {
     return jobs.filter(
@@ -2788,54 +2892,255 @@ function Index() {
           )}
 
           {section === "agenda" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Agenda</CardTitle>
-                <CardDescription>
-                  Vista diaria/semanal por técnico con acciones rápidas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {jobs
-                  .filter((job) => ["programado", "en_camino", "en_curso"].includes(job.status))
-                  .map((job) => (
-                    <div
-                      key={job.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border p-2"
-                    >
-                      <div className="min-w-0 text-sm">
-                        <p className="truncate font-medium">
-                          {job.code} · {job.scheduledAt}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {job.technician} · {job.address || "Sin dirección"}
-                        </p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateJobStatus(job.id, "en_camino")}
-                        >
-                          En camino
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateJobStatus(job.id, "en_curso")}
-                        >
-                          Iniciado
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyWhatsApp(job.id, "visita")}
-                        >
-                          Avisar
-                        </Button>
-                      </div>
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-secondary/20">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <CardTitle>Agenda</CardTitle>
+                    <CardDescription>
+                      Calendario operativo por fecha, técnico y estado de visita.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center rounded-md border bg-background">
+                      <Button
+                        aria-label="Periodo anterior"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          setAgendaDate(
+                            toDateKey(
+                              agendaView === "semana"
+                                ? addDays(agendaBaseDate, -7)
+                                : addMonths(agendaBaseDate, -1),
+                            ),
+                          )
+                        }
+                      >
+                        <ChevronLeft />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setAgendaDate(toDateKey(new Date()))}
+                      >
+                        Hoy
+                      </Button>
+                      <Button
+                        aria-label="Periodo siguiente"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          setAgendaDate(
+                            toDateKey(
+                              agendaView === "semana"
+                                ? addDays(agendaBaseDate, 7)
+                                : addMonths(agendaBaseDate, 1),
+                            ),
+                          )
+                        }
+                      >
+                        <ChevronRight />
+                      </Button>
                     </div>
-                  ))}
+                    <div className="rounded-md border bg-background p-1">
+                      <Button
+                        size="sm"
+                        variant={agendaView === "semana" ? "default" : "ghost"}
+                        onClick={() => setAgendaView("semana")}
+                      >
+                        Semana
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={agendaView === "mes" ? "default" : "ghost"}
+                        onClick={() => setAgendaView("mes")}
+                      >
+                        Mes
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 p-0">
+                <div className="flex flex-col gap-2 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold capitalize">
+                      {formatAgendaRange(agendaBaseDate, agendaView)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {visibleAgendaJobs.length} trabajos visibles ·{" "}
+                      {agendaJobs.filter((job) => job.status === "en_curso").length} en curso
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => setNewDialog("aviso")}>
+                    <Plus />
+                    Nuevo aviso
+                  </Button>
+                </div>
+
+                {agendaView === "semana" ? (
+                  <div className="overflow-x-auto px-3 pb-4">
+                    <div className="grid min-w-[920px] grid-cols-7 rounded-md border bg-background">
+                      {agendaWeekDays.map((day, index) => {
+                        const dateKey = toDateKey(day);
+                        const dayJobs = agendaJobsByDate.get(dateKey) ?? [];
+                        const isToday = dateKey === agendaTodayKey;
+                        return (
+                          <div key={dateKey} className="min-h-[560px] border-r last:border-r-0">
+                            <div
+                              className={`sticky top-0 z-10 border-b bg-background px-3 py-2 ${
+                                isToday ? "bg-primary/5" : ""
+                              }`}
+                            >
+                              <p className="text-xs font-medium uppercase text-muted-foreground">
+                                {WEEKDAY_LABELS[index]}
+                              </p>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <p className="text-2xl font-semibold">{day.getDate()}</p>
+                                <Badge variant={isToday ? "default" : "outline"}>
+                                  {dayJobs.length}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="space-y-2 p-2">
+                              {dayJobs.length === 0 ? (
+                                <div className="flex h-24 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+                                  Sin visitas
+                                </div>
+                              ) : (
+                                dayJobs.map((job) => {
+                                  const client = job.clientId
+                                    ? clientsById.get(job.clientId)
+                                    : undefined;
+                                  return (
+                                    <div
+                                      key={job.id}
+                                      className="space-y-2 rounded-md border bg-card p-2 shadow-sm"
+                                    >
+                                      <button
+                                        className="block w-full min-w-0 text-left"
+                                        onClick={() => {
+                                          setSelectedJobId(job.id);
+                                          setSection("trabajos");
+                                        }}
+                                      >
+                                        <div className="space-y-1">
+                                          <p className="truncate text-sm font-semibold">
+                                            {job.code}
+                                          </p>
+                                          <WorkStatusBadge status={job.status} />
+                                        </div>
+                                        <p className="mt-1 line-clamp-2 text-xs">
+                                          {job.symptoms || job.serviceType}
+                                        </p>
+                                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                                          {job.technician || "Sin técnico"} ·{" "}
+                                          {client?.name ?? "Sin cliente"}
+                                        </p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                          {job.address || "Sin dirección"}
+                                        </p>
+                                      </button>
+                                      <div className="grid grid-cols-3 gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateJobStatus(job.id, "en_camino")}
+                                        >
+                                          Ruta
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => updateJobStatus(job.id, "en_curso")}
+                                        >
+                                          Inicio
+                                        </Button>
+                                        <Button
+                                          aria-label="Copiar WhatsApp de visita"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => copyWhatsApp(job.id, "visita")}
+                                        >
+                                          <Phone />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-3 pb-4">
+                    <div className="grid grid-cols-7 rounded-t-md border border-b-0 bg-secondary/40">
+                      {MONTH_WEEKDAY_LABELS.map((label) => (
+                        <div
+                          key={label}
+                          className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+                        >
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 rounded-b-md border bg-background">
+                      {agendaMonthDays.map((day) => {
+                        const dateKey = toDateKey(day);
+                        const dayJobs = agendaJobsByDate.get(dateKey) ?? [];
+                        const isCurrentMonth = day.getMonth() === agendaBaseDate.getMonth();
+                        const isToday = dateKey === agendaTodayKey;
+                        const isSelected = dateKey === agendaSelectedKey;
+                        return (
+                          <button
+                            key={dateKey}
+                            className={`min-h-28 border-r border-b p-2 text-left last:border-r-0 hover:bg-secondary/40 ${
+                              isCurrentMonth
+                                ? "bg-background"
+                                : "bg-secondary/25 text-muted-foreground"
+                            } ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+                            onClick={() => {
+                              setAgendaDate(dateKey);
+                              setAgendaView("semana");
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span
+                                className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                                  isToday ? "bg-primary text-primary-foreground" : ""
+                                }`}
+                              >
+                                {day.getDate()}
+                              </span>
+                              {dayJobs.length > 0 ? (
+                                <Badge variant="outline">{dayJobs.length}</Badge>
+                              ) : null}
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              {dayJobs.slice(0, 3).map((job) => (
+                                <div
+                                  key={job.id}
+                                  className="truncate rounded-sm bg-primary/10 px-1.5 py-1 text-xs font-medium text-primary"
+                                >
+                                  {job.code} · {job.technician || "Sin técnico"}
+                                </div>
+                              ))}
+                              {dayJobs.length > 3 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  +{dayJobs.length - 3} más
+                                </p>
+                              ) : null}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
