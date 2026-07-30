@@ -146,6 +146,7 @@ function Index() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<WorkStatus | "todos">("todos");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [selectedJobTab, setSelectedJobTab] = useState("resumen");
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudState, setCloudState] = useState<CloudSyncState>({
     status: isCloudConfigured() ? "signed-out" : "local",
@@ -191,6 +192,7 @@ function Index() {
     distanceKm: "8",
     urgent: false,
   });
+  const [newJobError, setNewJobError] = useState("");
   const [newMaterial, setNewMaterial] = useState({
     name: "",
     sku: "",
@@ -563,9 +565,33 @@ function Index() {
   };
 
   const createJob = (mode: "aviso" | "presupuesto") => {
-    if (!newJob.symptoms.trim()) {
+    const requiredFields = [
+      { valid: Boolean(newJob.clientId), label: "cliente" },
+      { valid: Boolean(newJob.symptoms.trim()), label: "síntoma/trabajo" },
+      { valid: Boolean(newJob.address.trim()), label: "dirección" },
+      { valid: Boolean(newJob.technician.trim()), label: "técnico" },
+      { valid: Boolean(newJob.serviceType.trim()), label: "tipo de servicio" },
+      { valid: Boolean(newJob.description.trim()), label: "descripción inicial" },
+    ];
+    const missingFields = requiredFields
+      .filter((field) => !field.valid)
+      .map((field) => field.label);
+    const estimatedHours = Number.parseFloat(newJob.estimatedHours);
+    const invalidHours =
+      mode === "presupuesto" && (!Number.isFinite(estimatedHours) || estimatedHours <= 0);
+
+    if (missingFields.length > 0 || invalidHours) {
+      setNewJobError(
+        [
+          missingFields.length > 0 ? `Faltan: ${missingFields.join(", ")}.` : "",
+          invalidHours ? "Horas estimadas debe ser mayor que 0 para presupuestar." : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
       return;
     }
+    setNewJobError("");
 
     updateData((prev) => {
       const seq = prev.sequence;
@@ -581,12 +607,7 @@ function Index() {
               plannedMaterials: [],
             })
           : emptyEstimateTotals();
-      const status: WorkStatus =
-        mode === "presupuesto"
-          ? "presupuestado"
-          : !newJob.address.trim() || !newJob.clientId
-            ? "pendiente_datos"
-            : "nuevo";
+      const status: WorkStatus = mode === "presupuesto" ? "presupuestado" : "nuevo";
 
       const job = {
         id: `jb-${Date.now()}`,
@@ -636,14 +657,7 @@ function Index() {
               status: "borrador",
               sentAt: "",
               approvedAt: "",
-              lines: [
-                {
-                  description: "Mano de obra",
-                  qty: estimatedHours || 0,
-                  unitPrice: TARIFFS.hourlyStandard,
-                },
-                { description: "Salida", qty: 1, unitPrice: totals.callOut },
-              ],
+              lines: getEstimateLinesForJob(job),
               subtotal: totals.subtotal,
               vat: totals.vat,
               total: totals.total,
@@ -679,6 +693,7 @@ function Index() {
       distanceKm: "8",
       urgent: false,
     });
+    setNewJobError("");
     setNewDialog("");
   };
 
@@ -732,6 +747,27 @@ function Index() {
     issuedAt: new Date().toISOString().slice(0, 10),
     notes: "",
   });
+
+  const getLaborQty = (job: (typeof data.jobs)[number]) =>
+    Number((job.estimatedHours > 0 ? job.estimatedHours : 1).toFixed(2));
+
+  const getLaborDescription = (job: (typeof data.jobs)[number]) =>
+    job.serviceType?.trim() ? `Mano de obra - ${job.serviceType.trim()}` : "Mano de obra";
+
+  const getEstimateLinesForJob = (job: (typeof data.jobs)[number]) =>
+    [
+      {
+        description: getLaborDescription(job),
+        qty: getLaborQty(job),
+        unitPrice: job.urgent ? TARIFFS.hourlyUrgent : TARIFFS.hourlyStandard,
+      },
+      { description: "Salida", qty: 1, unitPrice: job.totals.callOut },
+      ...job.plannedMaterials.map((line) => ({
+        description: line.name,
+        qty: line.qty,
+        unitPrice: line.salePrice,
+      })),
+    ].filter((line) => line.qty > 0 && line.unitPrice > 0);
 
   const updateJobStatus = (jobId: string, status: WorkStatus) => {
     updateData((prev) => {
@@ -821,14 +857,7 @@ function Index() {
             status: "borrador",
             sentAt: "",
             approvedAt: "",
-            lines: [
-              {
-                description: "Mano de obra",
-                qty: updatedJob.estimatedHours || 1,
-                unitPrice: updatedJob.urgent ? TARIFFS.hourlyUrgent : TARIFFS.hourlyStandard,
-              },
-              { description: "Salida", qty: 1, unitPrice: totals.callOut },
-            ],
+            lines: getEstimateLinesForJob(updatedJob),
             subtotal: totals.subtotal,
             vat: totals.vat,
             total: totals.total,
@@ -847,19 +876,7 @@ function Index() {
   };
 
   const syncEstimateForJob = (estimates: Estimate[], job: (typeof data.jobs)[number]) => {
-    const nextLines = [
-      {
-        description: "Mano de obra",
-        qty: job.estimatedHours || 1,
-        unitPrice: job.urgent ? TARIFFS.hourlyUrgent : TARIFFS.hourlyStandard,
-      },
-      { description: "Salida", qty: 1, unitPrice: job.totals.callOut },
-      ...job.plannedMaterials.map((line) => ({
-        description: line.name,
-        qty: line.qty,
-        unitPrice: line.salePrice,
-      })),
-    ].filter((line) => line.qty > 0 && line.unitPrice > 0);
+    const nextLines = getEstimateLinesForJob(job);
 
     const existingEstimate = estimates.find((estimate) => estimate.jobId === job.id);
     if (!existingEstimate && !job.clientId) {
@@ -895,6 +912,111 @@ function Index() {
           }
         : estimate,
     );
+  };
+
+  const shouldRecalculateTotals = (job: (typeof data.jobs)[number]) =>
+    job.requiresApproval || job.totals.total > 0 || job.plannedMaterials.length > 0;
+
+  const updateJobDetails = (
+    jobId: string,
+    changes: Partial<
+      Pick<
+        (typeof data.jobs)[number],
+        | "assetId"
+        | "clientId"
+        | "symptoms"
+        | "description"
+        | "address"
+        | "zone"
+        | "technician"
+        | "serviceType"
+        | "priority"
+        | "scheduledAt"
+        | "distanceKm"
+        | "estimatedHours"
+        | "urgent"
+        | "diagnosis"
+        | "solution"
+        | "notesClient"
+        | "notesInternal"
+      >
+    >,
+  ) => {
+    updateData((prev) => {
+      let updatedJob = prev.jobs.find((job) => job.id === jobId);
+      if (!updatedJob) {
+        return prev;
+      }
+
+      updatedJob = {
+        ...updatedJob,
+        ...changes,
+        status:
+          updatedJob.status === "pendiente_datos" &&
+          (changes.clientId || updatedJob.clientId) &&
+          (changes.address || updatedJob.address) &&
+          (changes.symptoms || updatedJob.symptoms)
+            ? "nuevo"
+            : updatedJob.status,
+      };
+
+      if (shouldRecalculateTotals(updatedJob)) {
+        updatedJob = {
+          ...updatedJob,
+          totals: calculateEstimateTotals({
+            estimatedHours: updatedJob.estimatedHours || 1,
+            distanceKm: updatedJob.distanceKm || 0,
+            urgent: updatedJob.urgent,
+            plannedMaterials: updatedJob.plannedMaterials,
+          }),
+        };
+      }
+
+      const invoices = prev.invoices.map((invoice) =>
+        invoice.jobId === jobId
+          ? {
+              ...invoice,
+              subtotal: updatedJob.totals.subtotal,
+              vat: updatedJob.totals.vat,
+              total: updatedJob.totals.total,
+            }
+          : invoice,
+      );
+
+      return {
+        ...prev,
+        jobs: prev.jobs.map((job) => (job.id === jobId ? updatedJob : job)),
+        estimates: shouldRecalculateTotals(updatedJob)
+          ? syncEstimateForJob(prev.estimates, updatedJob)
+          : prev.estimates,
+        invoices,
+      };
+    });
+  };
+
+  const saveDiagnosis = (jobId: string) => {
+    updateData((prev) => {
+      const source = prev.jobs.find((job) => job.id === jobId);
+      if (!source || !source.diagnosis.trim()) {
+        return prev;
+      }
+
+      const updatedJob = {
+        ...source,
+        status:
+          source.status === "nuevo" || source.status === "en_curso"
+            ? ("diagnosticado" as const)
+            : source.status,
+      };
+      const event = createStatusEvent(updatedJob, source.status, "Diagnóstico guardado");
+      const next = {
+        ...prev,
+        jobs: prev.jobs.map((job) => (job.id === jobId ? updatedJob : job)),
+        events: [event, ...prev.events],
+      };
+      void emitOperationalEvent("job_status_changed", updatedJob, next);
+      return next;
+    });
   };
 
   const addPlannedMaterialToJob = (jobId: string) => {
@@ -1074,7 +1196,7 @@ function Index() {
         ? `Factura ${invoice?.invoiceNumber ?? job.code}`
         : `Presupuesto ${job.code}`;
     const lines = [
-      ["Mano de obra", "1", formatCurrency(job.totals.labor)],
+      [getLaborDescription(job), String(getLaborQty(job)), formatCurrency(job.totals.labor)],
       ["Salida", "1", formatCurrency(job.totals.callOut)],
       ["Kilometraje", "1", formatCurrency(job.totals.kmCost)],
       ...job.plannedMaterials.map((line) => [
@@ -1142,7 +1264,7 @@ function Index() {
     <div class="total"><span>Total</span><span>${formatCurrency(job.totals.total)}</span></div>
   </section>
   <h2>Notas</h2>
-  <p>${escapeHtml(job.notesClient || job.description || "Presupuesto sujeto a validación final tras revisión técnica.")}</p>
+  <p>${escapeHtml(job.notesClient || job.description || (kind === "factura" ? "Factura emitida por trabajos realizados." : "Presupuesto sujeto a validación final tras revisión técnica."))}</p>
 </body>
 </html>`;
 
@@ -1285,6 +1407,7 @@ function Index() {
             onOpenChange={(open) => {
               if (!open) {
                 setNewDialog("");
+                setNewJobError("");
               }
             }}
           >
@@ -1320,10 +1443,16 @@ function Index() {
                     Entrada rápida sin importe. Sirve para llamadas, WhatsApp o avisos desde
                     Telegram.
                   </p>
+                  {newJobError ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                      {newJobError}
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Síntoma</Label>
+                      <Label>Síntoma *</Label>
                       <Input
+                        required
                         value={newJob.symptoms}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
@@ -1331,7 +1460,7 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Cliente</Label>
+                      <Label>Cliente *</Label>
                       <Select
                         value={newJob.clientId}
                         onValueChange={(value) =>
@@ -1351,8 +1480,9 @@ function Index() {
                       </Select>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label>Dirección</Label>
+                      <Label>Dirección *</Label>
                       <Input
+                        required
                         value={newJob.address}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, address: event.target.value }))
@@ -1360,8 +1490,9 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Técnico</Label>
+                      <Label>Técnico *</Label>
                       <Input
+                        required
                         value={newJob.technician}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, technician: event.target.value }))
@@ -1412,8 +1543,9 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label>Descripción inicial</Label>
+                      <Label>Descripción inicial *</Label>
                       <Textarea
+                        required
                         value={newJob.description}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, description: event.target.value }))
@@ -1433,10 +1565,16 @@ function Index() {
                   <p className="text-sm text-muted-foreground">
                     Crea trabajo presupuestado con mano de obra, salida, kilómetros, IVA y PDF.
                   </p>
+                  {newJobError ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                      {newJobError}
+                    </div>
+                  ) : null}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Síntoma / trabajo</Label>
+                      <Label>Síntoma / trabajo *</Label>
                       <Input
+                        required
                         value={newJob.symptoms}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, symptoms: event.target.value }))
@@ -1444,7 +1582,7 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Cliente</Label>
+                      <Label>Cliente *</Label>
                       <Select
                         value={newJob.clientId}
                         onValueChange={(value) =>
@@ -1464,8 +1602,9 @@ function Index() {
                       </Select>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label>Dirección</Label>
+                      <Label>Dirección *</Label>
                       <Input
+                        required
                         value={newJob.address}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, address: event.target.value }))
@@ -1473,8 +1612,9 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Horas estimadas</Label>
+                      <Label>Horas estimadas *</Label>
                       <Input
+                        required
                         type="number"
                         min="0"
                         step="0.25"
@@ -1497,8 +1637,9 @@ function Index() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Técnico</Label>
+                      <Label>Técnico *</Label>
                       <Input
+                        required
                         value={newJob.technician}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, technician: event.target.value }))
@@ -1525,8 +1666,9 @@ function Index() {
                       </Select>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
-                      <Label>Detalle para el cliente</Label>
+                      <Label>Detalle para el cliente *</Label>
                       <Textarea
+                        required
                         value={newJob.description}
                         onChange={(event) =>
                           setNewJob((prev) => ({ ...prev, description: event.target.value }))
@@ -2137,7 +2279,7 @@ function Index() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateJobStatus(selectedJob.id, "diagnosticado")}
+                        onClick={() => setSelectedJobTab("resumen")}
                       >
                         Añadir diagnóstico
                       </Button>
@@ -2191,40 +2333,165 @@ function Index() {
                       </Button>
                     </div>
 
-                    <Tabs defaultValue="resumen">
+                    <Tabs value={selectedJobTab} onValueChange={setSelectedJobTab}>
                       <TabsList className="grid h-auto w-full grid-cols-3 gap-1 bg-transparent p-0">
                         <TabsTrigger value="resumen">Resumen</TabsTrigger>
                         <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
                         <TabsTrigger value="historial">Historial</TabsTrigger>
                       </TabsList>
 
-                      <TabsContent value="resumen" className="space-y-2">
+                      <TabsContent value="resumen" className="space-y-3">
+                        <div className="rounded-md border p-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label>Aviso / síntoma</Label>
+                              <Input
+                                value={selectedJob.symptoms}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    symptoms: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Cliente</Label>
+                              <Select
+                                value={selectedJob.clientId ?? ""}
+                                onValueChange={(value) =>
+                                  updateJobDetails(selectedJob.id, { clientId: value })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {data.clients.map((client) => (
+                                    <SelectItem key={client.id} value={client.id}>
+                                      {client.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Fecha prevista</Label>
+                              <Input
+                                type="date"
+                                value={selectedJob.scheduledAt}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    scheduledAt: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label>Dirección</Label>
+                              <Input
+                                value={selectedJob.address}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    address: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Técnico</Label>
+                              <Input
+                                value={selectedJob.technician}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    technician: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Prioridad</Label>
+                              <Select
+                                value={selectedJob.priority}
+                                onValueChange={(value) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    priority: value as WorkPriority,
+                                    urgent: value === "urgente",
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="baja">Baja</SelectItem>
+                                  <SelectItem value="media">Media</SelectItem>
+                                  <SelectItem value="alta">Alta</SelectItem>
+                                  <SelectItem value="urgente">Urgente</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Horas previstas</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                value={selectedJob.estimatedHours}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    estimatedHours: Number.parseFloat(event.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Distancia (km)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={selectedJob.distanceKm}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    distanceKm: Number.parseFloat(event.target.value) || 0,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label>Descripción inicial</Label>
+                              <Textarea
+                                value={selectedJob.description}
+                                onChange={(event) =>
+                                  updateJobDetails(selectedJob.id, {
+                                    description: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
                         <Label>Diagnóstico</Label>
                         <Textarea
                           value={selectedJob.diagnosis}
-                          onChange={(event) => {
-                            const diagnosis = event.target.value;
-                            updateData((prev) => ({
-                              ...prev,
-                              jobs: prev.jobs.map((job) =>
-                                job.id === selectedJob.id ? { ...job, diagnosis } : job,
-                              ),
-                            }));
-                          }}
+                          onChange={(event) =>
+                            updateJobDetails(selectedJob.id, { diagnosis: event.target.value })
+                          }
                         />
                         <Label>Solución</Label>
                         <Textarea
                           value={selectedJob.solution}
-                          onChange={(event) => {
-                            const solution = event.target.value;
-                            updateData((prev) => ({
-                              ...prev,
-                              jobs: prev.jobs.map((job) =>
-                                job.id === selectedJob.id ? { ...job, solution } : job,
-                              ),
-                            }));
-                          }}
+                          onChange={(event) =>
+                            updateJobDetails(selectedJob.id, { solution: event.target.value })
+                          }
                         />
+                        <Button
+                          size="sm"
+                          onClick={() => saveDiagnosis(selectedJob.id)}
+                          disabled={!selectedJob.diagnosis.trim()}
+                        >
+                          Guardar diagnóstico
+                        </Button>
                       </TabsContent>
 
                       <TabsContent value="presupuesto" className="space-y-3 text-sm">
