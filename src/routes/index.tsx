@@ -125,6 +125,7 @@ const MOBILE_PRIMARY_SECTIONS: MainSection[] = ["inicio", "trabajos", "agenda"];
 const MOBILE_COMPACT_LABELS: Partial<Record<MainSection, string>> = {
   inicio: "Inicio",
 };
+const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-cropped.jpg";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
@@ -229,6 +230,7 @@ export const Route = createFileRoute("/")({
           "Gestor SAT para mantenimiento técnico operativo: móvil primero, historial por equipo, presupuestos, partes y cobros.",
       },
       { property: "og:title", content: "Astoreka MTO | Gestor SAT operativo" },
+      { property: "og:image", content: ASTOREKA_LOGO_SRC },
       {
         property: "og:description",
         content:
@@ -1458,9 +1460,11 @@ function Index() {
   <title>${escapeHtml(title)}</title>
   <style>
     body { font-family: Inter, Arial, sans-serif; color: #18252b; margin: 40px; line-height: 1.45; }
-    header { display: flex; justify-content: space-between; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
     h1 { margin: 0; font-size: 28px; }
     h2 { margin: 26px 0 10px; font-size: 16px; }
+    .brand { display: flex; align-items: center; gap: 18px; }
+    .brand-logo { width: 150px; height: auto; display: block; }
     .muted { color: #5f6f75; }
     .box { border: 1px solid #d7e2e4; border-radius: 8px; padding: 14px; margin: 12px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -1475,9 +1479,12 @@ function Index() {
 <body>
   <button onclick="window.print()">Imprimir / guardar PDF</button>
   <header>
-    <div>
-      <h1>Astoreka MTO</h1>
-      <p class="muted">Mantenimiento técnico operativo</p>
+    <div class="brand">
+      <img class="brand-logo" src="${ASTOREKA_LOGO_SRC}" alt="Astoreka" />
+      <div>
+        <h1>Astoreka MTO</h1>
+        <p class="muted">Mantenimiento técnico operativo</p>
+      </div>
     </div>
     <div>
       <strong>${escapeHtml(title)}</strong><br />
@@ -1561,7 +1568,7 @@ function Index() {
         <aside className="hidden lg:sticky lg:top-4 lg:block lg:h-[calc(100vh-2rem)]">
           <div className="flex h-full flex-col rounded-lg border bg-sidebar p-3 shadow-sm">
             <div className="border-b pb-4">
-              <p className="text-lg font-semibold tracking-normal">Astoreka</p>
+              <img src={ASTOREKA_LOGO_SRC} alt="Astoreka" className="h-16 w-auto object-contain" />
               <p className="text-xs font-medium uppercase text-muted-foreground">MTO operations</p>
             </div>
 
@@ -1611,9 +1618,11 @@ function Index() {
         <div className="flex min-w-0 flex-col gap-4">
           <header className="rounded-lg border bg-card p-4 shadow-sm">
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase text-muted-foreground lg:hidden">
-                Astoreka MTO
-              </p>
+              <img
+                src={ASTOREKA_LOGO_SRC}
+                alt="Astoreka MTO"
+                className="mb-3 h-14 w-auto object-contain lg:hidden"
+              />
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
                   Centro operativo
