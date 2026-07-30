@@ -296,6 +296,10 @@ function Index() {
     distanceKm: "8",
     urgent: false,
   });
+  const [scheduleDraft, setScheduleDraft] = useState({
+    jobId: "",
+    scheduledAt: toDateKey(new Date()),
+  });
   const [newJobError, setNewJobError] = useState("");
   const [newMaterial, setNewMaterial] = useState({
     name: "",
@@ -413,6 +417,10 @@ function Index() {
   const selectedJob = useMemo(
     () => jobs.find((job) => job.id === selectedJobId),
     [jobs, selectedJobId],
+  );
+  const scheduleJob = useMemo(
+    () => jobs.find((job) => job.id === scheduleDraft.jobId),
+    [jobs, scheduleDraft.jobId],
   );
   const queuedN8nEvents = getQueuedN8nEvents().length;
 
@@ -550,6 +558,15 @@ function Index() {
 
   const openJobFromAgenda = (jobId: string) => {
     openJob(jobId);
+  };
+
+  const openScheduleDialog = (jobId: string) => {
+    const job = jobs.find((item) => item.id === jobId);
+    setScheduleDraft({
+      jobId,
+      scheduledAt: job?.scheduledAt || toDateKey(new Date()),
+    });
+    setNewDialog("cita");
   };
 
   const getAgendaClientName = (job: (typeof jobs)[number]) =>
@@ -1022,6 +1039,50 @@ function Index() {
       );
       return next;
     });
+  };
+
+  const scheduleVisit = () => {
+    if (!scheduleDraft.jobId || !scheduleDraft.scheduledAt) {
+      return;
+    }
+
+    const terminalStatuses: WorkStatus[] = [
+      "realizado",
+      "facturado",
+      "cobrado",
+      "cerrado",
+      "cancelado",
+    ];
+
+    updateData((prev) => {
+      const source = prev.jobs.find((job) => job.id === scheduleDraft.jobId);
+      if (!source) {
+        return prev;
+      }
+
+      const updatedJob = {
+        ...source,
+        scheduledAt: scheduleDraft.scheduledAt,
+        status: terminalStatuses.includes(source.status) ? source.status : ("programado" as const),
+      };
+      const event = createStatusEvent(
+        updatedJob,
+        source.status,
+        `Visita programada para ${scheduleDraft.scheduledAt}`,
+      );
+      const next = {
+        ...prev,
+        jobs: prev.jobs.map((job) => (job.id === source.id ? updatedJob : job)),
+        events: [event, ...prev.events],
+      };
+      void emitOperationalEvent("job_status_changed", updatedJob, next);
+      return next;
+    });
+
+    setAgendaDate(scheduleDraft.scheduledAt);
+    setAgendaView("dia");
+    setNewDialog("");
+    setSection("agenda");
   };
 
   const convertJobToEstimate = (jobId: string) => {
@@ -2242,17 +2303,77 @@ function Index() {
 
                     <TabsContent value="cita" className="space-y-3">
                       <p className="text-sm text-muted-foreground">
-                        La cita nace desde un trabajo existente. Entra en Trabajos, abre la ficha y
-                        pulsa Programar visita.
+                        Elige el trabajo y la fecha. Al guardar queda programado y se abre el día en
+                        Agenda.
                       </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label>Trabajo</Label>
+                          <Select
+                            value={scheduleDraft.jobId}
+                            onValueChange={(value) => {
+                              const job = jobs.find((item) => item.id === value);
+                              setScheduleDraft({
+                                jobId: value,
+                                scheduledAt: job?.scheduledAt || toDateKey(new Date()),
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar trabajo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {jobs.map((job) => {
+                                const client = job.clientId
+                                  ? clientsById.get(job.clientId)
+                                  : undefined;
+                                return (
+                                  <SelectItem key={job.id} value={job.id}>
+                                    {job.code} · {client?.name ?? "Sin cliente"}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Fecha</Label>
+                          <Input
+                            type="date"
+                            value={scheduleDraft.scheduledAt}
+                            onChange={(event) =>
+                              setScheduleDraft((prev) => ({
+                                ...prev,
+                                scheduledAt: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Estado</Label>
+                          <div className="flex min-h-9 items-center rounded-md border bg-secondary/30 px-3 text-sm">
+                            {scheduleJob ? <WorkStatusBadge status={scheduleJob.status} /> : "-"}
+                          </div>
+                        </div>
+                        {scheduleJob ? (
+                          <div className="rounded-md border bg-secondary/30 p-3 text-sm sm:col-span-2">
+                            <p className="font-medium">{scheduleJob.symptoms}</p>
+                            <p className="text-muted-foreground">
+                              {scheduleJob.address || "Sin dirección"} ·{" "}
+                              {scheduleJob.technician || "Sin técnico"}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
                       <DialogFooter>
+                        <Button variant="outline" onClick={() => setNewDialog("")}>
+                          Cancelar
+                        </Button>
                         <Button
-                          onClick={() => {
-                            setNewDialog("");
-                            setSection("trabajos");
-                          }}
+                          onClick={scheduleVisit}
+                          disabled={!scheduleDraft.jobId || !scheduleDraft.scheduledAt}
                         >
-                          Ir a trabajos
+                          Agendar visita
                         </Button>
                       </DialogFooter>
                     </TabsContent>
@@ -2560,7 +2681,7 @@ function Index() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => updateJobStatus(selectedJob.id, "programado")}
+                          onClick={() => openScheduleDialog(selectedJob.id)}
                         >
                           Programar visita
                         </Button>
