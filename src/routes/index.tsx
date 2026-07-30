@@ -149,10 +149,11 @@ function formatStatusLabel(status: WorkStatus) {
   return status.replaceAll("_", " ");
 }
 
-type AgendaView = "semana" | "mes";
+type AgendaView = "dia" | "semana" | "mes" | "horas";
 
 const WEEKDAY_LABELS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 const MONTH_WEEKDAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
+const AGENDA_HOURS = Array.from({ length: 13 }, (_, index) => 8 + index);
 
 function toDateKey(date: Date) {
   const year = date.getFullYear();
@@ -194,6 +195,15 @@ function parseDateKey(dateKey: string) {
 function formatAgendaRange(date: Date, view: AgendaView) {
   if (view === "mes") {
     return new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(date);
+  }
+
+  if (view === "dia" || view === "horas") {
+    return new Intl.DateTimeFormat("es-ES", {
+      weekday: "long",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(date);
   }
 
   const start = getWeekStart(date);
@@ -503,13 +513,41 @@ function Index() {
   }, [agendaJobs]);
   const agendaTodayKey = toDateKey(new Date());
   const agendaSelectedKey = toDateKey(agendaBaseDate);
+  const agendaSelectedJobs = agendaJobsByDate.get(agendaSelectedKey) ?? [];
   const visibleAgendaJobs = useMemo(() => {
+    if (agendaView === "dia" || agendaView === "horas") {
+      return agendaJobs.filter((job) => job.scheduledAt === agendaSelectedKey);
+    }
+
     const visibleKeys =
       agendaView === "semana"
         ? new Set(agendaWeekDays.map(toDateKey))
         : new Set(agendaMonthDays.map(toDateKey));
     return agendaJobs.filter((job) => visibleKeys.has(job.scheduledAt));
-  }, [agendaJobs, agendaMonthDays, agendaView, agendaWeekDays]);
+  }, [agendaJobs, agendaMonthDays, agendaSelectedKey, agendaView, agendaWeekDays]);
+
+  const shiftAgendaDate = (direction: -1 | 1) => {
+    const nextDate =
+      agendaView === "mes"
+        ? addMonths(agendaBaseDate, direction)
+        : agendaView === "semana"
+          ? addDays(agendaBaseDate, direction * 7)
+          : addDays(agendaBaseDate, direction);
+    setAgendaDate(toDateKey(nextDate));
+  };
+
+  const openAgendaDay = (dateKey: string, view: AgendaView = "dia") => {
+    setAgendaDate(dateKey);
+    setAgendaView(view);
+  };
+
+  const openJobFromAgenda = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setSection("trabajos");
+  };
+
+  const getAgendaClientName = (job: (typeof jobs)[number]) =>
+    job.clientId ? (clientsById.get(job.clientId)?.name ?? "Sin cliente") : "Sin cliente";
 
   const needsAttention = useMemo(() => {
     return jobs.filter(
@@ -2907,15 +2945,7 @@ function Index() {
                         aria-label="Periodo anterior"
                         size="icon"
                         variant="ghost"
-                        onClick={() =>
-                          setAgendaDate(
-                            toDateKey(
-                              agendaView === "semana"
-                                ? addDays(agendaBaseDate, -7)
-                                : addMonths(agendaBaseDate, -1),
-                            ),
-                          )
-                        }
+                        onClick={() => shiftAgendaDate(-1)}
                       >
                         <ChevronLeft />
                       </Button>
@@ -2930,20 +2960,19 @@ function Index() {
                         aria-label="Periodo siguiente"
                         size="icon"
                         variant="ghost"
-                        onClick={() =>
-                          setAgendaDate(
-                            toDateKey(
-                              agendaView === "semana"
-                                ? addDays(agendaBaseDate, 7)
-                                : addMonths(agendaBaseDate, 1),
-                            ),
-                          )
-                        }
+                        onClick={() => shiftAgendaDate(1)}
                       >
                         <ChevronRight />
                       </Button>
                     </div>
                     <div className="rounded-md border bg-background p-1">
+                      <Button
+                        size="sm"
+                        variant={agendaView === "dia" ? "default" : "ghost"}
+                        onClick={() => setAgendaView("dia")}
+                      >
+                        Día
+                      </Button>
                       <Button
                         size="sm"
                         variant={agendaView === "semana" ? "default" : "ghost"}
@@ -2957,6 +2986,13 @@ function Index() {
                         onClick={() => setAgendaView("mes")}
                       >
                         Mes
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={agendaView === "horas" ? "default" : "ghost"}
+                        onClick={() => setAgendaView("horas")}
+                      >
+                        Horas
                       </Button>
                     </div>
                   </div>
@@ -2993,82 +3029,60 @@ function Index() {
                                 isToday ? "bg-primary/5" : ""
                               }`}
                             >
-                              <p className="text-xs font-medium uppercase text-muted-foreground">
-                                {WEEKDAY_LABELS[index]}
-                              </p>
-                              <div className="mt-1 flex items-center justify-between gap-2">
-                                <p className="text-2xl font-semibold">{day.getDate()}</p>
-                                <Badge variant={isToday ? "default" : "outline"}>
-                                  {dayJobs.length}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="space-y-2 p-2">
-                              {dayJobs.length === 0 ? (
-                                <div className="flex h-24 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                                  Sin visitas
+                              <button
+                                className="block w-full rounded-sm text-left hover:text-primary"
+                                onClick={() => openAgendaDay(dateKey)}
+                              >
+                                <p className="text-xs font-medium uppercase text-muted-foreground">
+                                  {WEEKDAY_LABELS[index]}
+                                </p>
+                                <div className="mt-1 flex items-center justify-between gap-2">
+                                  <p className="text-2xl font-semibold">{day.getDate()}</p>
+                                  <Badge variant={isToday ? "default" : "outline"}>
+                                    {dayJobs.length}
+                                  </Badge>
                                 </div>
+                              </button>
+                              <Button
+                                className="mt-2 h-7 w-full text-xs"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openAgendaDay(dateKey)}
+                              >
+                                Ver día
+                              </Button>
+                              <Button
+                                className="h-7 w-full text-xs"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openAgendaDay(dateKey, "horas")}
+                              >
+                                Por hora
+                              </Button>
+                            </div>
+                            <div className="space-y-1 p-2">
+                              {dayJobs.length === 0 ? (
+                                <button
+                                  className="flex h-24 w-full items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:border-primary/40 hover:text-primary"
+                                  onClick={() => openAgendaDay(dateKey)}
+                                >
+                                  Sin visitas
+                                </button>
                               ) : (
-                                dayJobs.map((job) => {
-                                  const client = job.clientId
-                                    ? clientsById.get(job.clientId)
-                                    : undefined;
-                                  return (
-                                    <div
-                                      key={job.id}
-                                      className="space-y-2 rounded-md border bg-card p-2 shadow-sm"
-                                    >
-                                      <button
-                                        className="block w-full min-w-0 text-left"
-                                        onClick={() => {
-                                          setSelectedJobId(job.id);
-                                          setSection("trabajos");
-                                        }}
-                                      >
-                                        <div className="space-y-1">
-                                          <p className="truncate text-sm font-semibold">
-                                            {job.code}
-                                          </p>
-                                          <WorkStatusBadge status={job.status} />
-                                        </div>
-                                        <p className="mt-1 line-clamp-2 text-xs">
-                                          {job.symptoms || job.serviceType}
-                                        </p>
-                                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                                          {job.technician || "Sin técnico"} ·{" "}
-                                          {client?.name ?? "Sin cliente"}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                          {job.address || "Sin dirección"}
-                                        </p>
-                                      </button>
-                                      <div className="grid grid-cols-3 gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateJobStatus(job.id, "en_camino")}
-                                        >
-                                          Ruta
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateJobStatus(job.id, "en_curso")}
-                                        >
-                                          Inicio
-                                        </Button>
-                                        <Button
-                                          aria-label="Copiar WhatsApp de visita"
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => copyWhatsApp(job.id, "visita")}
-                                        >
-                                          <Phone />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  );
-                                })
+                                dayJobs.map((job) => (
+                                  <button
+                                    key={job.id}
+                                    className={`block w-full min-w-0 rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                    onClick={() => openJobFromAgenda(job.id)}
+                                  >
+                                    <p className="truncate font-semibold">
+                                      {getAgendaClientName(job)}
+                                    </p>
+                                    <p className="truncate opacity-80">
+                                      {job.code} · {job.technician || "Sin técnico"}
+                                    </p>
+                                  </button>
+                                ))
                               )}
                             </div>
                           </div>
@@ -3076,7 +3090,7 @@ function Index() {
                       })}
                     </div>
                   </div>
-                ) : (
+                ) : agendaView === "mes" ? (
                   <div className="px-3 pb-4">
                     <div className="grid grid-cols-7 rounded-t-md border border-b-0 bg-secondary/40">
                       {MONTH_WEEKDAY_LABELS.map((label) => (
@@ -3096,19 +3110,18 @@ function Index() {
                         const isToday = dateKey === agendaTodayKey;
                         const isSelected = dateKey === agendaSelectedKey;
                         return (
-                          <button
+                          <div
                             key={dateKey}
-                            className={`min-h-28 border-r border-b p-2 text-left last:border-r-0 hover:bg-secondary/40 ${
+                            className={`min-h-28 border-r border-b p-2 text-left last:border-r-0 ${
                               isCurrentMonth
                                 ? "bg-background"
                                 : "bg-secondary/25 text-muted-foreground"
                             } ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
-                            onClick={() => {
-                              setAgendaDate(dateKey);
-                              setAgendaView("semana");
-                            }}
                           >
-                            <div className="flex items-center justify-between gap-1">
+                            <button
+                              className="flex w-full items-center justify-between gap-1 rounded-sm hover:text-primary"
+                              onClick={() => openAgendaDay(dateKey)}
+                            >
                               <span
                                 className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
                                   isToday ? "bg-primary text-primary-foreground" : ""
@@ -3119,25 +3132,144 @@ function Index() {
                               {dayJobs.length > 0 ? (
                                 <Badge variant="outline">{dayJobs.length}</Badge>
                               ) : null}
-                            </div>
+                            </button>
                             <div className="mt-2 space-y-1">
                               {dayJobs.slice(0, 3).map((job) => (
-                                <div
+                                <button
                                   key={job.id}
-                                  className="truncate rounded-sm bg-primary/10 px-1.5 py-1 text-xs font-medium text-primary"
+                                  className={`block w-full truncate rounded-sm border px-1.5 py-1 text-left text-xs font-medium hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                  onClick={() => openJobFromAgenda(job.id)}
                                 >
-                                  {job.code} · {job.technician || "Sin técnico"}
-                                </div>
+                                  {getAgendaClientName(job)}
+                                </button>
                               ))}
                               {dayJobs.length > 3 ? (
-                                <p className="text-xs text-muted-foreground">
+                                <button
+                                  className="text-xs text-muted-foreground hover:text-primary"
+                                  onClick={() => openAgendaDay(dateKey)}
+                                >
                                   +{dayJobs.length - 3} más
-                                </p>
+                                </button>
                               ) : null}
                             </div>
-                          </button>
+                          </div>
                         );
                       })}
+                    </div>
+                  </div>
+                ) : agendaView === "dia" ? (
+                  <div className="space-y-3 px-4 pb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-secondary/25 p-3">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {agendaSelectedJobs.length} visitas en el día
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Sin hora exacta todavía: se muestran como eventos del día.
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={() => setAgendaView("horas")}>
+                        Por hora
+                      </Button>
+                    </div>
+
+                    {agendaSelectedJobs.length === 0 ? (
+                      <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                        No hay visitas en este día.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        {agendaSelectedJobs.map((job) => (
+                          <div key={job.id} className="rounded-md border bg-card p-3">
+                            <button
+                              className="block w-full text-left"
+                              onClick={() => openJobFromAgenda(job.id)}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-semibold">{getAgendaClientName(job)}</p>
+                                <WorkStatusBadge status={job.status} />
+                              </div>
+                              <p className="mt-1 text-sm">{job.symptoms || job.serviceType}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {job.code} · {job.technician || "Sin técnico"}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {job.address || "Sin dirección"}
+                              </p>
+                            </button>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateJobStatus(job.id, "en_camino")}
+                              >
+                                Ruta
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateJobStatus(job.id, "en_curso")}
+                              >
+                                Inicio
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => copyWhatsApp(job.id, "visita")}
+                              >
+                                <Phone />
+                                WhatsApp
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="px-3 pb-4">
+                    <div className="rounded-md border bg-background">
+                      <div className="grid grid-cols-[72px_minmax(0,1fr)] border-b bg-secondary/25">
+                        <div className="border-r px-3 py-2 text-xs font-medium text-muted-foreground">
+                          Hora
+                        </div>
+                        <div className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                          Visitas
+                        </div>
+                      </div>
+                      {agendaSelectedJobs.length > 0 ? (
+                        <div className="grid grid-cols-[72px_minmax(0,1fr)] border-b">
+                          <div className="border-r px-3 py-3 text-xs font-medium text-muted-foreground">
+                            Todo día
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 p-2">
+                            {agendaSelectedJobs.map((job) => (
+                              <button
+                                key={job.id}
+                                className={`min-w-40 rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                onClick={() => openJobFromAgenda(job.id)}
+                              >
+                                <p className="truncate font-semibold">{getAgendaClientName(job)}</p>
+                                <p className="truncate opacity-80">
+                                  {job.code} · {job.technician || "Sin técnico"}
+                                </p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {AGENDA_HOURS.map((hour) => (
+                        <div key={hour} className="grid min-h-16 grid-cols-[72px_minmax(0,1fr)]">
+                          <div className="border-r border-b px-3 py-3 text-xs text-muted-foreground">
+                            {String(hour).padStart(2, "0")}:00
+                          </div>
+                          <button
+                            aria-label={`Crear aviso a las ${String(hour).padStart(2, "0")}:00`}
+                            className="border-b px-3 py-3 text-left text-xs text-muted-foreground hover:bg-secondary/30"
+                            onClick={() => setNewDialog("aviso")}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
