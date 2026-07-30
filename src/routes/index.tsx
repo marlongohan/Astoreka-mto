@@ -1353,16 +1353,6 @@ function Index() {
     }
   };
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `astoreka-export-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   const escapeHtml = (value: string) =>
     value
       .replaceAll("&", "&amp;")
@@ -1467,6 +1457,36 @@ function Index() {
   const currentClient = selectedJob?.clientId ? clientsById.get(selectedJob.clientId) : undefined;
   const currentAsset = selectedJob?.assetId ? assetsById.get(selectedJob.assetId) : undefined;
   const currentInvoice = selectedJob ? invoicesByJob.get(selectedJob.id) : undefined;
+  const quickActions = (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <Button size="sm" onClick={() => setNewDialog("aviso")}>
+        <Plus />
+        Crear aviso
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setSection("agenda")}>
+        <CalendarDays />
+        Programar
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => selectedJobId && copyWhatsApp(selectedJobId, "visita")}
+        disabled={!selectedJobId}
+      >
+        <Copy />
+        WhatsApp
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => selectedJobId && markCollected(selectedJobId)}
+        disabled={!selectedJobId}
+      >
+        <Euro />
+        Cobrado
+      </Button>
+    </div>
+  );
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -1521,34 +1541,32 @@ function Index() {
         </aside>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <header className="grid gap-3 rounded-lg border bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+          <header className="rounded-lg border bg-card p-4 shadow-sm">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase text-muted-foreground lg:hidden">
                 Astoreka MTO
               </p>
-              <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
-                Centro operativo
-              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
+                  Centro operativo
+                </h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={isCloudConfigured() ? "default" : "outline"}>
+                    {cloudState.status === "ready"
+                      ? "Supabase activo"
+                      : isCloudConfigured()
+                        ? "Supabase listo"
+                        : "Local primero"}
+                  </Badge>
+                  <Badge variant={isN8nConfigured() ? "default" : "outline"}>
+                    {isN8nConfigured() ? "n8n activo" : `n8n cola ${queuedN8nEvents}`}
+                  </Badge>
+                </div>
+              </div>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 Bandeja de avisos, trabajos, materiales y cobros para mantenimiento técnico.
               </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-              <Badge variant={isCloudConfigured() ? "default" : "outline"}>
-                {cloudState.status === "ready"
-                  ? "Supabase activo"
-                  : isCloudConfigured()
-                    ? "Supabase listo"
-                    : "Local primero"}
-              </Badge>
-              <Badge variant={isN8nConfigured() ? "default" : "outline"}>
-                {isN8nConfigured() ? "n8n activo" : `n8n cola ${queuedN8nEvents}`}
-              </Badge>
-              <Button variant="outline" size="sm" onClick={exportJson}>
-                <FileText />
-                Exportar JSON
-              </Button>
+              {quickActions}
             </div>
           </header>
 
@@ -2326,37 +2344,6 @@ function Index() {
                         <WorkStatusBadge status={job.status} />
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
-
-                <Card className="overflow-hidden">
-                  <CardHeader className="border-b bg-secondary/20">
-                    <CardTitle>Acciones rápidas</CardTitle>
-                    <CardDescription>Siempre la siguiente acción recomendada.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-2 sm:grid-cols-2">
-                    <Button onClick={() => setNewDialog("aviso")}>
-                      <Plus />
-                      Crear aviso
-                    </Button>
-                    <Button variant="outline" onClick={() => setSection("agenda")}>
-                      <CalendarDays />
-                      Programar visita
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => selectedJobId && copyWhatsApp(selectedJobId, "visita")}
-                    >
-                      <Copy />
-                      Enviar WhatsApp
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => selectedJobId && markCollected(selectedJobId)}
-                    >
-                      <Euro />
-                      Marcar cobrado
-                    </Button>
                   </CardContent>
                 </Card>
               </div>
