@@ -1412,7 +1412,7 @@ function Index() {
 
   const copyWhatsApp = async (
     jobId: string,
-    type: "visita" | "presupuesto" | "cobro",
+    type: "visita" | "presupuesto" | "factura" | "cobro",
     openChat = false,
   ) => {
     const job = data.jobs.find((entry) => entry.id === jobId);
@@ -1421,18 +1421,51 @@ function Index() {
     }
     const client = job.clientId ? clientsById.get(job.clientId) : undefined;
     const text = getWhatsAppText(type, job, client);
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(text).catch(() => undefined);
-    }
+    let chatOpened = false;
+
     if (openChat && typeof window !== "undefined") {
       const phone = client?.phone.replace(/\D/g, "");
       if (phone) {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
-        setQuickActionMessage(`WhatsApp preparado para ${client?.name ?? job.code}.`);
-        return;
+        chatOpened = true;
       }
     }
-    setQuickActionMessage(`Texto de WhatsApp copiado para ${client?.name ?? job.code}.`);
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      await navigator.clipboard.writeText(text).catch(() => undefined);
+    }
+
+    setQuickActionMessage(
+      chatOpened
+        ? `WhatsApp preparado para ${client?.name ?? job.code}.`
+        : `Texto de WhatsApp copiado para ${client?.name ?? job.code}.`,
+    );
+    return chatOpened;
+  };
+
+  const getWhatsAppHref = (jobId: string, type: "visita" | "presupuesto" | "factura" | "cobro") => {
+    const job = data.jobs.find((entry) => entry.id === jobId);
+    if (!job) {
+      return undefined;
+    }
+    const client = job.clientId ? clientsById.get(job.clientId) : undefined;
+    const phone = client?.phone.replace(/\D/g, "");
+    if (!phone) {
+      return undefined;
+    }
+    const text = getWhatsAppText(type, job, client);
+    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  };
+
+  const prepareDocumentForWhatsApp = async (kind: "presupuesto" | "factura", jobId: string) => {
+    const hasWhatsAppLink = Boolean(getWhatsAppHref(jobId, kind));
+    openPrintableDocument(kind, jobId);
+    await copyWhatsApp(jobId, kind);
+    setQuickActionMessage(
+      hasWhatsAppLink
+        ? `${kind === "factura" ? "Factura" : "Presupuesto"} preparado: PDF abierto y WhatsApp listo para adjuntarlo.`
+        : `${kind === "factura" ? "Factura" : "Presupuesto"} preparado: PDF abierto y texto copiado.`,
+    );
   };
 
   const escapeHtml = (value: string) =>
@@ -1550,6 +1583,12 @@ function Index() {
   const currentClient = selectedJob?.clientId ? clientsById.get(selectedJob.clientId) : undefined;
   const currentAsset = selectedJob?.assetId ? assetsById.get(selectedJob.assetId) : undefined;
   const currentInvoice = selectedJob ? invoicesByJob.get(selectedJob.id) : undefined;
+  const currentEstimateWhatsAppHref = selectedJob
+    ? getWhatsAppHref(selectedJob.id, "presupuesto")
+    : undefined;
+  const currentInvoiceWhatsAppHref = selectedJob
+    ? getWhatsAppHref(selectedJob.id, "factura")
+    : undefined;
 
   const getSelectedOrFirstActiveJob = () =>
     selectedJob ??
@@ -2633,6 +2672,7 @@ function Index() {
                           const client = job.clientId ? clientsById.get(job.clientId) : undefined;
                           const asset = job.assetId ? assetsById.get(job.assetId) : undefined;
                           const nextStatus = STEP_SUGGESTED_BY_STATUS[job.status];
+                          const estimateWhatsAppHref = getWhatsAppHref(job.id, "presupuesto");
                           return (
                             <TableRow
                               key={job.id}
@@ -2675,14 +2715,49 @@ function Index() {
                                     <Phone />
                                   </Button>
                                   {job.totals.total > 0 ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openPrintableDocument("presupuesto", job.id)}
-                                    >
-                                      <FileDown />
-                                      PDF
-                                    </Button>
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openPrintableDocument("presupuesto", job.id)}
+                                      >
+                                        <FileDown />
+                                        PDF
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild={Boolean(estimateWhatsAppHref)}
+                                        onClick={
+                                          estimateWhatsAppHref
+                                            ? undefined
+                                            : () =>
+                                                void prepareDocumentForWhatsApp(
+                                                  "presupuesto",
+                                                  job.id,
+                                                )
+                                        }
+                                      >
+                                        {estimateWhatsAppHref ? (
+                                          <a
+                                            href={estimateWhatsAppHref}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            onClick={() =>
+                                              void prepareDocumentForWhatsApp("presupuesto", job.id)
+                                            }
+                                          >
+                                            <Phone />
+                                            WhatsApp PDF
+                                          </a>
+                                        ) : (
+                                          <>
+                                            <Phone />
+                                            WhatsApp PDF
+                                          </>
+                                        )}
+                                      </Button>
+                                    </>
                                   ) : null}
                                   <Button
                                     size="sm"
@@ -2797,14 +2872,31 @@ function Index() {
                         <Button size="sm" variant="outline" onClick={focusDiagnosisField}>
                           Añadir diagnóstico
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => copyWhatsApp(selectedJob.id, "presupuesto")}
-                          disabled={selectedJob.totals.total <= 0}
-                        >
-                          WhatsApp presupuesto
-                        </Button>
+                        {selectedJob.totals.total > 0 && currentEstimateWhatsAppHref ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <a
+                              href={currentEstimateWhatsAppHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() =>
+                                void prepareDocumentForWhatsApp("presupuesto", selectedJob.id)
+                              }
+                            >
+                              WhatsApp presupuesto PDF
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void prepareDocumentForWhatsApp("presupuesto", selectedJob.id)
+                            }
+                            disabled={selectedJob.totals.total <= 0}
+                          >
+                            WhatsApp presupuesto PDF
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -2845,6 +2937,31 @@ function Index() {
                         >
                           PDF factura
                         </Button>
+                        {currentInvoice && currentInvoiceWhatsAppHref ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <a
+                              href={currentInvoiceWhatsAppHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() =>
+                                void prepareDocumentForWhatsApp("factura", selectedJob.id)
+                              }
+                            >
+                              Enviar factura
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void prepareDocumentForWhatsApp("factura", selectedJob.id)
+                            }
+                            disabled={!currentInvoice}
+                          >
+                            Enviar factura
+                          </Button>
+                        )}
                       </div>
 
                       <Tabs value={selectedJobTab} onValueChange={setSelectedJobTab}>
@@ -3627,6 +3744,9 @@ function Index() {
                 {data.estimates.map((estimate) => {
                   const job = data.jobs.find((entry) => entry.id === estimate.jobId);
                   const client = data.clients.find((entry) => entry.id === estimate.clientId);
+                  const estimateWhatsAppHref = job
+                    ? getWhatsAppHref(job.id, "presupuesto")
+                    : undefined;
                   return (
                     <div
                       key={estimate.id}
@@ -3645,9 +3765,32 @@ function Index() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => job && copyWhatsApp(job.id, "presupuesto")}
+                          onClick={() => job && openPrintableDocument("presupuesto", job.id)}
                         >
-                          WhatsApp
+                          PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild={Boolean(estimateWhatsAppHref)}
+                          onClick={
+                            estimateWhatsAppHref || !job
+                              ? undefined
+                              : () => void prepareDocumentForWhatsApp("presupuesto", job.id)
+                          }
+                        >
+                          {estimateWhatsAppHref && job ? (
+                            <a
+                              href={estimateWhatsAppHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => void prepareDocumentForWhatsApp("presupuesto", job.id)}
+                            >
+                              WhatsApp PDF
+                            </a>
+                          ) : (
+                            "WhatsApp PDF"
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -3695,6 +3838,7 @@ function Index() {
                 {data.invoices.map((invoice) => {
                   const job = data.jobs.find((entry) => entry.id === invoice.jobId);
                   const client = job?.clientId ? clientsById.get(job.clientId) : undefined;
+                  const invoiceWhatsAppHref = job ? getWhatsAppHref(job.id, "factura") : undefined;
                   return (
                     <div
                       key={invoice.id}
@@ -3714,13 +3858,38 @@ function Index() {
                         </Badge>
                         <p className="font-semibold">{formatCurrency(invoice.total)}</p>
                         {job ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openPrintableDocument("factura", job.id)}
-                          >
-                            PDF
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openPrintableDocument("factura", job.id)}
+                            >
+                              PDF
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              asChild={Boolean(invoiceWhatsAppHref)}
+                              onClick={
+                                invoiceWhatsAppHref
+                                  ? undefined
+                                  : () => void prepareDocumentForWhatsApp("factura", job.id)
+                              }
+                            >
+                              {invoiceWhatsAppHref ? (
+                                <a
+                                  href={invoiceWhatsAppHref}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={() => void prepareDocumentForWhatsApp("factura", job.id)}
+                                >
+                                  Enviar
+                                </a>
+                              ) : (
+                                "Enviar"
+                              )}
+                            </Button>
+                          </>
                         ) : null}
                         {invoice.status !== "cobrada" ? (
                           <Button size="sm" onClick={() => job && markCollected(job.id)}>

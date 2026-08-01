@@ -168,7 +168,7 @@ export function getNextAction(job: Job) {
 }
 
 export function getWhatsAppText(
-  type: "visita" | "presupuesto" | "cobro",
+  type: "visita" | "presupuesto" | "factura" | "cobro",
   job: Job,
   client?: Client,
 ) {
@@ -180,6 +180,10 @@ export function getWhatsAppText(
 
   if (type === "presupuesto") {
     return `Hola ${customer}, ya tenemos tu presupuesto del trabajo ${job.code}.\nSubtotal: ${formatCurrency(job.totals.subtotal)}\nIVA (21%): ${formatCurrency(job.totals.vat)}\nTotal: ${formatCurrency(job.totals.total)}\n¿Lo aprobamos para programar ejecución?`;
+  }
+
+  if (type === "factura") {
+    return `Hola ${customer}, ya tienes emitida la factura del trabajo ${job.code}.\nSubtotal: ${formatCurrency(job.totals.subtotal)}\nIVA (21%): ${formatCurrency(job.totals.vat)}\nTotal: ${formatCurrency(job.totals.total)}\nTe adjunto el PDF de la factura.`;
   }
 
   return `Hola ${customer}, te recordamos el cobro pendiente del trabajo ${job.code}.\nImporte pendiente: ${formatCurrency(job.totals.total)}\nCuando te venga bien, lo cerramos.`;
