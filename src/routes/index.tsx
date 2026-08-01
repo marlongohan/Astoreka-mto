@@ -1471,83 +1471,6 @@ function Index() {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
 
-  const escapePdfText = (value: string) =>
-    value
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/€/g, "EUR")
-      .replace(/[^\x20-\x7E]/g, "")
-      .replace(/\\/g, "\\\\")
-      .replace(/\(/g, "\\(")
-      .replace(/\)/g, "\\)");
-
-  const wrapPdfText = (value: string, maxLength = 82) => {
-    const words = escapePdfText(value).split(/\s+/);
-    const lines: string[] = [];
-    let current = "";
-
-    words.forEach((word) => {
-      const next = current ? `${current} ${word}` : word;
-      if (next.length > maxLength && current) {
-        lines.push(current);
-        current = word;
-        return;
-      }
-      current = next;
-    });
-
-    if (current) {
-      lines.push(current);
-    }
-
-    return lines.length ? lines : [""];
-  };
-
-  const createSimplePdfBytes = (title: string, lines: string[]) => {
-    const contentLines = [
-      "BT",
-      "/F1 18 Tf",
-      "50 792 Td",
-      `(${escapePdfText(title)}) Tj`,
-      "/F1 10 Tf",
-      ...lines.flatMap((line) => wrapPdfText(line).map((wrapped) => `0 -16 Td (${wrapped}) Tj`)),
-      "ET",
-    ];
-    const content = contentLines.join("\n");
-    const objects = [
-      "<< /Type /Catalog /Pages 2 0 R >>",
-      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-    ];
-    let pdf = "%PDF-1.4\n";
-    const offsets = [0];
-
-    objects.forEach((object, index) => {
-      offsets.push(pdf.length);
-      pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-    });
-
-    const xrefOffset = pdf.length;
-    pdf += `xref\n0 ${objects.length + 1}\n`;
-    pdf += "0000000000 65535 f \n";
-    offsets.slice(1).forEach((offset) => {
-      pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-    });
-    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-    return new TextEncoder().encode(pdf);
-  };
-
-  const bytesToBase64 = (bytes: Uint8Array) => {
-    let binary = "";
-    bytes.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
-    return window.btoa(binary);
-  };
-
   const openPrintableDocument = (kind: "presupuesto" | "factura", jobId: string) => {
     const job = data.jobs.find((entry) => entry.id === jobId);
     if (!job || job.totals.total <= 0) {
@@ -1572,36 +1495,6 @@ function Index() {
         formatCurrency(line.qty * line.salePrice),
       ]),
     ].filter(([, , amount]) => amount !== formatCurrency(0));
-    const pdfFilename = `${kind}-${job.code}.pdf`;
-    const pdfTextLines = [
-      "Astoreka MTO - Mantenimiento tecnico operativo",
-      `Fecha: ${new Date().toLocaleDateString("es-ES")}`,
-      "",
-      "Cliente",
-      client?.name ?? "Sin cliente",
-      client?.phone ?? "",
-      job.address || client?.address || "",
-      "",
-      "Trabajo",
-      `${job.code} - ${job.serviceType}`,
-      job.symptoms,
-      `Equipo: ${asset?.name ?? "-"} ${asset?.brand ?? ""} ${asset?.model ?? ""}`,
-      "",
-      "Detalle economico",
-      ...lines.map(([name, qty, amount]) => `${name} - Cantidad: ${qty} - Importe: ${amount}`),
-      "",
-      `Subtotal: ${formatCurrency(job.totals.subtotal)}`,
-      `IVA 21%: ${formatCurrency(job.totals.vat)}`,
-      `Total: ${formatCurrency(job.totals.total)}`,
-      "",
-      job.notesClient ||
-        job.description ||
-        (kind === "factura"
-          ? "Factura emitida por trabajos realizados."
-          : "Presupuesto sujeto a validacion final tras revision tecnica."),
-    ];
-    const pdfBase64 = bytesToBase64(createSimplePdfBytes(title, pdfTextLines));
-    const whatsAppText = getWhatsAppText(kind, job, client);
 
     const html = `<!doctype html>
 <html lang="es">
@@ -1633,8 +1526,7 @@ function Index() {
   <div class="document-actions">
     <button class="secondary" onclick="window.opener?.focus(); window.close(); history.back()">Volver a la app</button>
     <button onclick="window.print()">Imprimir / guardar PDF</button>
-    <button onclick="sharePdfViaWhatsApp()">Adjuntar PDF por WhatsApp</button>
-    <a class="button secondary" href="${escapeHtml(whatsAppHref ?? "#")}" target="_blank" rel="noreferrer">Enviar solo texto</a>
+    <a class="button" href="${escapeHtml(whatsAppHref ?? "#")}" target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
   </div>
   <header>
     <div class="brand">
@@ -1675,37 +1567,6 @@ function Index() {
   </section>
   <h2>Notas</h2>
   <p>${escapeHtml(job.notesClient || job.description || (kind === "factura" ? "Factura emitida por trabajos realizados." : "Presupuesto sujeto a validación final tras revisión técnica."))}</p>
-  <script>
-    const pdfBase64 = "${pdfBase64}";
-    const pdfFilename = ${JSON.stringify(pdfFilename)};
-    const whatsAppHref = ${JSON.stringify(whatsAppHref ?? "#")};
-    const whatsAppText = ${JSON.stringify(whatsAppText)};
-
-    function pdfFile() {
-      const binary = atob(pdfBase64);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
-      }
-      return new File([bytes], pdfFilename, { type: "application/pdf" });
-    }
-
-    async function sharePdfViaWhatsApp() {
-      const file = pdfFile();
-      if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-        await navigator.share({ files: [file], text: whatsAppText }).catch(() => undefined);
-        return;
-      }
-
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = pdfFilename;
-      link.click();
-      window.open(whatsAppHref, "_blank");
-      alert("Tu navegador no permite adjuntar el PDF automáticamente. He descargado el PDF; adjúntalo en WhatsApp desde el clip.");
-    }
-  </script>
 </body>
 </html>`;
 
