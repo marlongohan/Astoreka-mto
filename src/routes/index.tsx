@@ -1484,7 +1484,6 @@ function Index() {
       kind === "factura"
         ? `Factura ${invoice?.invoiceNumber ?? job.code}`
         : `Presupuesto ${job.code}`;
-    const whatsAppHref = getWhatsAppHref(jobId, kind);
     const lines = [
       [getLaborDescription(job), String(getLaborQty(job)), formatCurrency(job.totals.labor)],
       ["Salida", "1", formatCurrency(job.totals.callOut)],
@@ -1504,8 +1503,8 @@ function Index() {
   <style>
     body { font-family: Inter, Arial, sans-serif; color: #18252b; margin: 40px; line-height: 1.45; }
     .document-actions { display: flex; gap: 10px; margin-bottom: 24px; }
-    button, a.button { border: 1px solid #0f766e; border-radius: 6px; background: #0f766e; color: #fff; cursor: pointer; font: inherit; padding: 9px 13px; text-decoration: none; }
-    button.secondary, a.secondary { background: #fff; color: #0f766e; }
+    button { border: 1px solid #0f766e; border-radius: 6px; background: #0f766e; color: #fff; cursor: pointer; font: inherit; padding: 9px 13px; }
+    button.secondary { background: #fff; color: #0f766e; }
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
     h1 { margin: 0; font-size: 28px; }
     h2 { margin: 26px 0 10px; font-size: 16px; }
@@ -1526,7 +1525,6 @@ function Index() {
   <div class="document-actions">
     <button class="secondary" onclick="window.opener?.focus(); window.close(); history.back()">Volver a la app</button>
     <button onclick="window.print()">Imprimir / guardar PDF</button>
-    <a class="button" href="${escapeHtml(whatsAppHref ?? "#")}" target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
   </div>
   <header>
     <div class="brand">
