@@ -1424,9 +1424,9 @@ function Index() {
     let chatOpened = false;
 
     if (openChat && typeof window !== "undefined") {
-      const phone = client?.phone.replace(/\D/g, "");
-      if (phone) {
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+      const href = getWhatsAppHref(jobId, type);
+      if (href) {
+        window.open(href, "_blank");
         chatOpened = true;
       }
     }
@@ -1450,21 +1450,17 @@ function Index() {
     }
     const client = job.clientId ? clientsById.get(job.clientId) : undefined;
     const phone = client?.phone.replace(/\D/g, "");
-    if (!phone) {
-      return undefined;
-    }
+    const normalizedPhone = phone?.length === 9 ? `34${phone}` : phone;
     const text = getWhatsAppText(type, job, client);
-    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    return normalizedPhone
+      ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
   };
 
   const prepareDocumentForWhatsApp = async (kind: "presupuesto" | "factura", jobId: string) => {
-    const hasWhatsAppLink = Boolean(getWhatsAppHref(jobId, kind));
-    openPrintableDocument(kind, jobId);
     await copyWhatsApp(jobId, kind);
     setQuickActionMessage(
-      hasWhatsAppLink
-        ? `${kind === "factura" ? "Factura" : "Presupuesto"} preparado: PDF abierto y WhatsApp listo para adjuntarlo.`
-        : `${kind === "factura" ? "Factura" : "Presupuesto"} preparado: PDF abierto y texto copiado.`,
+      `${kind === "factura" ? "Factura" : "Presupuesto"} preparado en WhatsApp. Usa el botón PDF para abrir o guardar el documento.`,
     );
   };
 
