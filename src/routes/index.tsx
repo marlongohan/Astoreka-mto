@@ -117,6 +117,7 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "presupuestos", label: "Presupuestos", icon: FileText },
   { key: "partes", label: "Partes", icon: ClipboardCheck },
   { key: "facturas", label: "Facturas / Cobros", icon: Euro },
+  { key: "administracion", label: "Administración", icon: FileDown },
   { key: "informes", label: "Informes", icon: BellRing },
   { key: "ajustes", label: "Ajustes", icon: Save },
 ];
@@ -217,6 +218,21 @@ function formatAgendaRange(date: Date, view: AgendaView) {
   const end = addDays(start, 6);
   const formatter = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" });
   return `${formatter.format(start)} - ${formatter.format(end)}`;
+}
+
+function getQuarterKey(dateValue: string) {
+  const date = dateValue ? parseDateKey(dateValue) : new Date();
+  const quarter = Math.floor(date.getMonth() / 3) + 1;
+  return `${date.getFullYear()}-T${quarter}`;
+}
+
+function getQuarterLabel(key: string) {
+  const [year, quarter] = key.split("-T");
+  return `T${quarter || ""} ${year || ""}`.trim();
+}
+
+function roundMoney(amount: number) {
+  return Number(amount.toFixed(2));
 }
 
 function getMonthDays(date: Date) {
@@ -485,6 +501,44 @@ function Index() {
       monthMargin,
     };
   }, [jobs]);
+
+  const fiscalSummary = useMemo(() => {
+    const currentQuarterKey = getQuarterKey(new Date().toISOString().slice(0, 10));
+    const issuedInvoices = data.invoices.filter(
+      (invoice) =>
+        invoice.status !== "anulada" && getQuarterKey(invoice.issuedAt) === currentQuarterKey,
+    );
+    const quarterExpenses = data.expenses.filter(
+      (expense) => getQuarterKey(expense.date) === currentQuarterKey,
+    );
+    const salesSubtotal = issuedInvoices.reduce((sum, invoice) => sum + invoice.subtotal, 0);
+    const outputVat = issuedInvoices.reduce((sum, invoice) => sum + invoice.vat, 0);
+    const invoicedTotal = issuedInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
+    const collectedTotal = issuedInvoices
+      .filter((invoice) => invoice.status === "cobrada")
+      .reduce((sum, invoice) => sum + invoice.total, 0);
+    const expensesSubtotal = quarterExpenses.reduce((sum, expense) => sum + expense.subtotal, 0);
+    const inputVat = quarterExpenses.reduce((sum, expense) => sum + expense.vat, 0);
+    const expensesTotal = quarterExpenses.reduce((sum, expense) => sum + expense.total, 0);
+    const missingReceipts = quarterExpenses.filter((expense) => !expense.receiptAttached).length;
+
+    return {
+      quarterKey: currentQuarterKey,
+      quarterLabel: getQuarterLabel(currentQuarterKey),
+      issuedInvoices,
+      quarterExpenses,
+      salesSubtotal,
+      outputVat,
+      invoicedTotal,
+      collectedTotal,
+      expensesSubtotal,
+      inputVat,
+      expensesTotal,
+      vatDue: outputVat - inputVat,
+      estimatedResult: salesSubtotal - expensesSubtotal,
+      missingReceipts,
+    };
+  }, [data.expenses, data.invoices]);
 
   const jobsByGroup = useMemo(() => {
     return {
@@ -1574,6 +1628,59 @@ function Index() {
     }
     documentWindow.document.write(html);
     documentWindow.document.close();
+  };
+
+  const exportFiscalPack = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      period: fiscalSummary.quarterLabel,
+      totals: {
+        salesSubtotal: roundMoney(fiscalSummary.salesSubtotal),
+        outputVat: roundMoney(fiscalSummary.outputVat),
+        invoicedTotal: roundMoney(fiscalSummary.invoicedTotal),
+        collectedTotal: roundMoney(fiscalSummary.collectedTotal),
+        expensesSubtotal: roundMoney(fiscalSummary.expensesSubtotal),
+        inputVat: roundMoney(fiscalSummary.inputVat),
+        expensesTotal: roundMoney(fiscalSummary.expensesTotal),
+        vatDue: roundMoney(fiscalSummary.vatDue),
+        estimatedResult: roundMoney(fiscalSummary.estimatedResult),
+      },
+      invoices: fiscalSummary.issuedInvoices.map((invoice) => {
+        const job = data.jobs.find((entry) => entry.id === invoice.jobId);
+        const client = job?.clientId ? clientsById.get(job.clientId) : undefined;
+        return {
+          number: invoice.invoiceNumber,
+          issuedAt: invoice.issuedAt,
+          status: invoice.status,
+          client: client?.name ?? "",
+          jobCode: job?.code ?? "",
+          subtotal: roundMoney(invoice.subtotal),
+          vat: roundMoney(invoice.vat),
+          total: roundMoney(invoice.total),
+          paymentMethod: invoice.method,
+          paidAt: invoice.paidAt,
+        };
+      }),
+      expenses: fiscalSummary.quarterExpenses,
+      notes: [
+        "Exportación operativa para gestoría. No sustituye revisión fiscal profesional.",
+        "Adjuntar PDFs/fotos de facturas emitidas y justificantes de gasto antes de presentar modelos.",
+      ],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `astoreka-gestoria-${fiscalSummary.quarterKey}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setQuickActionMessage(`Paquete de gestoría ${fiscalSummary.quarterLabel} preparado.`);
   };
 
   const currentClient = selectedJob?.clientId ? clientsById.get(selectedJob.clientId) : undefined;
@@ -3898,6 +4005,165 @@ function Index() {
                 })}
               </CardContent>
             </Card>
+          )}
+
+          {section === "administracion" && (
+            <section className="grid gap-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard
+                  label={`Facturado ${fiscalSummary.quarterLabel}`}
+                  value={formatCurrency(fiscalSummary.invoicedTotal)}
+                  icon={Euro}
+                />
+                <KpiCard
+                  label="IVA repercutido"
+                  value={formatCurrency(fiscalSummary.outputVat)}
+                  icon={FileText}
+                />
+                <KpiCard
+                  label="IVA soportado"
+                  value={formatCurrency(fiscalSummary.inputVat)}
+                  icon={FileDown}
+                />
+                <KpiCard
+                  label="IVA estimado"
+                  value={formatCurrency(fiscalSummary.vatDue)}
+                  icon={TriangleAlert}
+                />
+              </div>
+
+              <Card>
+                <CardHeader className="border-b bg-secondary/20">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                    <div>
+                      <CardTitle>Administración / Fiscalidad</CardTitle>
+                      <CardDescription>
+                        Resumen secundario para IVA, gastos, trimestre y envío a gestoría.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={exportFiscalPack}>
+                      <FileDown />
+                      Exportar gestoría
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="grid gap-4 pt-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                  <div className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <InfoMetric
+                        label="Base ventas"
+                        value={formatCurrency(fiscalSummary.salesSubtotal)}
+                      />
+                      <InfoMetric
+                        label="Base gastos"
+                        value={formatCurrency(fiscalSummary.expensesSubtotal)}
+                      />
+                      <InfoMetric
+                        label="Cobrado"
+                        value={formatCurrency(fiscalSummary.collectedTotal)}
+                      />
+                      <InfoMetric
+                        label="Resultado aproximado"
+                        value={formatCurrency(fiscalSummary.estimatedResult)}
+                      />
+                    </div>
+
+                    <div className="rounded-md border">
+                      <div className="border-b bg-secondary/25 px-3 py-2">
+                        <p className="text-sm font-medium">Gastos del trimestre</p>
+                        <p className="text-xs text-muted-foreground">
+                          Materiales, vehículo, gestoría y justificantes pendientes.
+                        </p>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Proveedor</TableHead>
+                            <TableHead>Categoría</TableHead>
+                            <TableHead>IVA</TableHead>
+                            <TableHead>Total</TableHead>
+                            <TableHead>Justificante</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {fiscalSummary.quarterExpenses.map((expense) => (
+                            <TableRow key={expense.id}>
+                              <TableCell>{expense.date}</TableCell>
+                              <TableCell>
+                                <p className="font-medium">{expense.provider}</p>
+                                <p className="text-xs text-muted-foreground">{expense.concept}</p>
+                              </TableCell>
+                              <TableCell>{expense.category}</TableCell>
+                              <TableCell>{formatCurrency(expense.vat)}</TableCell>
+                              <TableCell>{formatCurrency(expense.total)}</TableCell>
+                              <TableCell>
+                                <Badge variant={expense.receiptAttached ? "secondary" : "outline"}>
+                                  {expense.receiptAttached ? "OK" : "Falta"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm font-medium">Checklist trimestre</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                        <li>Revisar facturas emitidas y anuladas.</li>
+                        <li>Adjuntar tickets/facturas de gastos.</li>
+                        <li>Separar IVA repercutido y soportado.</li>
+                        <li>Exportar paquete para gestoría.</li>
+                        <li>Confirmar modelos trimestrales antes de presentar.</li>
+                      </ul>
+                    </div>
+
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm font-medium">Alertas administrativas</p>
+                      <div className="mt-2 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Facturas pendientes</span>
+                          <Badge variant="outline">
+                            {
+                              fiscalSummary.issuedInvoices.filter(
+                                (invoice) => invoice.status !== "cobrada",
+                              ).length
+                            }
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Gastos sin justificante</span>
+                          <Badge
+                            variant={
+                              fiscalSummary.missingReceipts > 0 ? "destructive" : "secondary"
+                            }
+                          >
+                            {fiscalSummary.missingReceipts}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">IVA neto estimado</span>
+                          <span className="font-semibold">
+                            {formatCurrency(fiscalSummary.vatDue)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm font-medium">Alcance</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Astoreka prepara la información y reduce despistes, pero la presentación
+                        fiscal final queda para el autónomo o su gestoría.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
           )}
 
           {section === "informes" && (

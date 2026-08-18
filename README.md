@@ -15,6 +15,7 @@ Gestor SAT para mantenimiento técnico operativo: rápido en móvil, con histori
 - Estados completos del trabajo + historial de cambios.
 - Cálculo de presupuesto (IVA 21%, materiales, margen estimado).
 - Acciones rápidas (WhatsApp, cambio de estado, marcar cobrado, duplicar).
+- Administración secundaria con IVA repercutido/soportado, gastos, trimestre y exportación para gestoría.
 - Exportación de datos en JSON.
 
 ## Conectar backend (siguiente paso)

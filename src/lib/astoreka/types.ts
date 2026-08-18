@@ -49,6 +49,9 @@ export type EstimateStatus = "borrador" | "enviado" | "aceptado" | "rechazado" |
 
 export type WorkOrigin = "app" | "llamada" | "telegram" | "whatsapp" | "formulario";
 
+export type ExpenseCategory =
+  "materiales" | "herramientas" | "vehiculo" | "gestoria" | "software" | "seguros" | "otros";
+
 export interface Client {
   id: string;
   name: string;
@@ -182,6 +185,20 @@ export interface Estimate {
   total: number;
 }
 
+export interface Expense {
+  id: string;
+  date: string;
+  provider: string;
+  concept: string;
+  category: ExpenseCategory;
+  subtotal: number;
+  vat: number;
+  total: number;
+  paid: boolean;
+  receiptAttached: boolean;
+  notes: string;
+}
+
 export interface JobEvent {
   id: string;
   jobId: string;
@@ -213,6 +230,7 @@ export interface AppData {
   jobs: Job[];
   invoices: Invoice[];
   estimates: Estimate[];
+  expenses: Expense[];
   events: JobEvent[];
   knowledge: KnowledgeEntry[];
   sequence: number;
@@ -229,5 +247,6 @@ export type MainSection =
   | "presupuestos"
   | "partes"
   | "facturas"
+  | "administracion"
   | "informes"
   | "ajustes";

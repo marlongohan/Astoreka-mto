@@ -4,6 +4,7 @@ import type {
   Asset,
   Client,
   Estimate,
+  Expense,
   Invoice,
   Job,
   JobEvent,
@@ -490,6 +491,48 @@ const estimates: Estimate[] = [
   },
 ];
 
+const expenses: Expense[] = [
+  {
+    id: "ex-1",
+    date: new Date().toISOString().slice(0, 10),
+    provider: "Recambios Norte",
+    concept: "Compra bombas y consumibles para reparaciones",
+    category: "materiales",
+    subtotal: 96,
+    vat: 20.16,
+    total: 116.16,
+    paid: true,
+    receiptAttached: true,
+    notes: "Factura de proveedor lista para gestoría.",
+  },
+  {
+    id: "ex-2",
+    date: new Date().toISOString().slice(0, 10),
+    provider: "Gasolinera Busturia",
+    concept: "Combustible furgoneta técnica",
+    category: "vehiculo",
+    subtotal: 58.2,
+    vat: 12.22,
+    total: 70.42,
+    paid: true,
+    receiptAttached: false,
+    notes: "Falta adjuntar ticket.",
+  },
+  {
+    id: "ex-3",
+    date: new Date().toISOString().slice(0, 10),
+    provider: "Gestoría",
+    concept: "Cuota mensual gestión fiscal",
+    category: "gestoria",
+    subtotal: 75,
+    vat: 15.75,
+    total: 90.75,
+    paid: true,
+    receiptAttached: true,
+    notes: "",
+  },
+];
+
 const events: JobEvent[] = jobs.flatMap((job) => [
   {
     id: `ev-${job.id}-1`,
@@ -534,6 +577,7 @@ export const demoAppData: AppData = {
   jobs,
   invoices,
   estimates,
+  expenses,
   events,
   knowledge,
   sequence: 6,

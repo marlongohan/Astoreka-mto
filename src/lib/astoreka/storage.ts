@@ -111,6 +111,7 @@ export function normalizeAppData(value: unknown): AppData {
     jobs: normalizeJobs(record.jobs),
     invoices: asArray(record.invoices) as AppData["invoices"],
     estimates: asArray(record.estimates) as AppData["estimates"],
+    expenses: asArray(record.expenses) as AppData["expenses"],
     events: asArray(record.events) as AppData["events"],
     knowledge: asArray(record.knowledge) as AppData["knowledge"],
     sequence: asNumber(record.sequence, demoAppData.sequence),
