@@ -52,6 +52,17 @@ export type WorkOrigin = "app" | "llamada" | "telegram" | "whatsapp" | "formular
 export type ExpenseCategory =
   "materiales" | "herramientas" | "vehiculo" | "gestoria" | "software" | "seguros" | "otros";
 
+export type PurchaseDocumentType =
+  | "pedido_proveedor"
+  | "albaran_proveedor"
+  | "factura_proveedor"
+  | "recibo_proveedor"
+  | "ticket";
+
+export type PurchaseStatus = "borrador" | "pendiente" | "recibido" | "facturado" | "pagado";
+
+export type CreditNoteStatus = "borrador" | "emitida" | "devuelta" | "anulada";
+
 export interface Client {
   id: string;
   name: string;
@@ -199,6 +210,46 @@ export interface Expense {
   notes: string;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  nif: string;
+  phone: string;
+  email: string;
+  address: string;
+  category: ExpenseCategory;
+  paymentTerms: string;
+  notes: string;
+}
+
+export interface PurchaseDocument {
+  id: string;
+  supplierId: string;
+  type: PurchaseDocumentType;
+  reference: string;
+  status: PurchaseStatus;
+  date: string;
+  dueDate: string;
+  subtotal: number;
+  vat: number;
+  total: number;
+  linkedJobId?: string;
+  receiptAttached: boolean;
+  notes: string;
+}
+
+export interface CreditNote {
+  id: string;
+  invoiceId: string;
+  reference: string;
+  status: CreditNoteStatus;
+  date: string;
+  reason: string;
+  subtotal: number;
+  vat: number;
+  total: number;
+}
+
 export interface JobEvent {
   id: string;
   jobId: string;
@@ -231,6 +282,9 @@ export interface AppData {
   invoices: Invoice[];
   estimates: Estimate[];
   expenses: Expense[];
+  suppliers: Supplier[];
+  purchases: PurchaseDocument[];
+  creditNotes: CreditNote[];
   events: JobEvent[];
   knowledge: KnowledgeEntry[];
   sequence: number;
@@ -244,6 +298,7 @@ export type MainSection =
   | "clientes"
   | "equipos"
   | "stock"
+  | "compras"
   | "presupuestos"
   | "partes"
   | "facturas"

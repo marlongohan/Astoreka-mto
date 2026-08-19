@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BellRing,
+  Building2,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -19,11 +20,14 @@ import {
   Package,
   Phone,
   Plus,
+  ReceiptText,
   RefreshCcw,
   Save,
   Search,
+  ShoppingCart,
   TriangleAlert,
   Users,
+  Warehouse,
   Wrench,
 } from "lucide-react";
 
@@ -114,6 +118,7 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "clientes", label: "Clientes", icon: Users },
   { key: "equipos", label: "Equipos", icon: Hammer },
   { key: "stock", label: "Stock", icon: Package },
+  { key: "compras", label: "Compras", icon: ShoppingCart },
   { key: "presupuestos", label: "Presupuestos", icon: FileText },
   { key: "partes", label: "Partes", icon: ClipboardCheck },
   { key: "facturas", label: "Facturas / Cobros", icon: Euro },
@@ -233,6 +238,10 @@ function getQuarterLabel(key: string) {
 
 function roundMoney(amount: number) {
   return Number(amount.toFixed(2));
+}
+
+function formatCompactLabel(value: string) {
+  return value.replaceAll("_", " ");
 }
 
 function getMonthDays(date: Date) {
@@ -539,6 +548,45 @@ function Index() {
       missingReceipts,
     };
   }, [data.expenses, data.invoices]);
+
+  const erpSummary = useMemo(() => {
+    const stockCostValue = data.materials.reduce(
+      (sum, material) => sum + material.quantity * material.cost,
+      0,
+    );
+    const stockSaleValue = data.materials.reduce(
+      (sum, material) => sum + material.quantity * material.salePrice,
+      0,
+    );
+    const lowStockCount = data.materials.filter(
+      (material) => material.quantity <= material.minimum,
+    ).length;
+    const purchaseTotal = data.purchases.reduce((sum, purchase) => sum + purchase.total, 0);
+    const unpaidPurchases = data.purchases.filter((purchase) => purchase.status !== "pagado");
+    const pendingPurchaseTotal = unpaidPurchases.reduce((sum, purchase) => sum + purchase.total, 0);
+    const missingPurchaseReceipts = data.purchases.filter(
+      (purchase) => !purchase.receiptAttached,
+    ).length;
+    const creditNoteTotal = data.creditNotes
+      .filter((creditNote) => creditNote.status !== "anulada")
+      .reduce((sum, creditNote) => sum + creditNote.total, 0);
+    const pendingInvoiceTotal = data.invoices
+      .filter((invoice) => invoice.status !== "cobrada" && invoice.status !== "anulada")
+      .reduce((sum, invoice) => sum + invoice.total, 0);
+
+    return {
+      stockCostValue,
+      stockSaleValue,
+      lowStockCount,
+      purchaseTotal,
+      unpaidPurchases,
+      pendingPurchaseTotal,
+      missingPurchaseReceipts,
+      creditNoteTotal,
+      pendingInvoiceTotal,
+      treasuryBalance: fiscalSummary.collectedTotal - pendingPurchaseTotal,
+    };
+  }, [data.creditNotes, data.invoices, data.materials, data.purchases, fiscalSummary.collectedTotal]);
 
   const jobsByGroup = useMemo(() => {
     return {
@@ -3791,48 +3839,186 @@ function Index() {
           )}
 
           {section === "stock" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Stock / Materiales</CardTitle>
-                <CardDescription>
-                  Control de cantidad, mínimo, coste, venta y reservas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Material</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Cantidad</TableHead>
-                      <TableHead>Mínimo</TableHead>
-                      <TableHead>Coste</TableHead>
-                      <TableHead>Venta</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.materials.map((material) => (
-                      <TableRow key={material.id}>
-                        <TableCell className="font-medium">{material.name}</TableCell>
-                        <TableCell>{material.sku}</TableCell>
-                        <TableCell>{material.quantity}</TableCell>
-                        <TableCell>{material.minimum}</TableCell>
-                        <TableCell>{formatCurrency(material.cost)}</TableCell>
-                        <TableCell>{formatCurrency(material.salePrice)}</TableCell>
-                        <TableCell>
-                          {material.quantity <= material.minimum ? (
-                            <Badge variant="destructive">Bajo stock</Badge>
-                          ) : (
-                            <Badge variant="secondary">OK</Badge>
-                          )}
-                        </TableCell>
+            <section className="grid gap-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard
+                  label="Valor coste stock"
+                  value={formatCurrency(erpSummary.stockCostValue)}
+                  icon={Warehouse}
+                />
+                <KpiCard
+                  label="Valor venta stock"
+                  value={formatCurrency(erpSummary.stockSaleValue)}
+                  icon={Package}
+                />
+                <KpiCard
+                  label="Bajo mínimo"
+                  value={String(erpSummary.lowStockCount)}
+                  icon={TriangleAlert}
+                />
+                <KpiCard
+                  label="Proveedores activos"
+                  value={String(data.suppliers.length)}
+                  icon={Building2}
+                />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stock / Materiales</CardTitle>
+                  <CardDescription>
+                    Control de stock real, valoración, mínimo, margen y proveedor.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Material</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Proveedor</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Mínimo</TableHead>
+                        <TableHead>Coste</TableHead>
+                        <TableHead>Venta</TableHead>
+                        <TableHead>Margen</TableHead>
+                        <TableHead>Estado</TableHead>
                       </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.materials.map((material) => (
+                        <TableRow key={material.id}>
+                          <TableCell className="font-medium">{material.name}</TableCell>
+                          <TableCell>{material.sku}</TableCell>
+                          <TableCell>{material.provider}</TableCell>
+                          <TableCell>{material.quantity}</TableCell>
+                          <TableCell>{material.minimum}</TableCell>
+                          <TableCell>{formatCurrency(material.cost)}</TableCell>
+                          <TableCell>{formatCurrency(material.salePrice)}</TableCell>
+                          <TableCell>{formatCurrency(material.salePrice - material.cost)}</TableCell>
+                          <TableCell>
+                            {material.quantity <= material.minimum ? (
+                              <Badge variant="destructive">Bajo stock</Badge>
+                            ) : (
+                              <Badge variant="secondary">OK</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {section === "compras" && (
+            <section className="grid gap-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <KpiCard
+                  label="Compras registradas"
+                  value={formatCurrency(erpSummary.purchaseTotal)}
+                  icon={ShoppingCart}
+                />
+                <KpiCard
+                  label="Pendiente proveedor"
+                  value={formatCurrency(erpSummary.pendingPurchaseTotal)}
+                  icon={ReceiptText}
+                />
+                <KpiCard
+                  label="Docs sin justificante"
+                  value={String(erpSummary.missingPurchaseReceipts)}
+                  icon={TriangleAlert}
+                />
+                <KpiCard
+                  label="Proveedores"
+                  value={String(data.suppliers.length)}
+                  icon={Building2}
+                />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Compras</CardTitle>
+                    <CardDescription>
+                      Pedidos, albaranes, facturas proveedor, recibos y tickets.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Documento</TableHead>
+                          <TableHead>Proveedor</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Trabajo</TableHead>
+                          <TableHead>Justificante</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.purchases.map((purchase) => {
+                          const supplier = data.suppliers.find(
+                            (entry) => entry.id === purchase.supplierId,
+                          );
+                          const linkedJob = purchase.linkedJobId
+                            ? data.jobs.find((entry) => entry.id === purchase.linkedJobId)
+                            : undefined;
+                          return (
+                            <TableRow key={purchase.id}>
+                              <TableCell>
+                                <p className="font-medium">{purchase.reference}</p>
+                                <p className="text-xs text-muted-foreground">{purchase.date}</p>
+                              </TableCell>
+                              <TableCell>{supplier?.name ?? "-"}</TableCell>
+                              <TableCell>{formatCompactLabel(purchase.type)}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={purchase.status === "pagado" ? "secondary" : "outline"}
+                                >
+                                  {formatCompactLabel(purchase.status)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{formatCurrency(purchase.total)}</TableCell>
+                              <TableCell>{linkedJob?.code ?? "-"}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={purchase.receiptAttached ? "secondary" : "destructive"}
+                                >
+                                  {purchase.receiptAttached ? "OK" : "Falta"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Proveedores</CardTitle>
+                    <CardDescription>Datos mínimos para compras y facturas recibidas.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {data.suppliers.map((supplier) => (
+                      <div key={supplier.id} className="rounded-md border p-3 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{supplier.name}</p>
+                          <Badge variant="outline">{supplier.category}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{supplier.nif}</p>
+                        <p>{supplier.paymentTerms}</p>
+                        <p className="text-xs text-muted-foreground">{supplier.notes}</p>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
           )}
 
           {section === "presupuestos" && (
@@ -3935,9 +4121,25 @@ function Index() {
             <Card>
               <CardHeader>
                 <CardTitle>Facturas / Cobros</CardTitle>
-                <CardDescription>Pendientes de cobrar, método y resumen de caja.</CardDescription>
+                <CardDescription>
+                  Facturas emitidas, cobros, abonos y libro de ventas simplificado.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
+                <div className="grid gap-3 pb-2 sm:grid-cols-3">
+                  <InfoMetric
+                    label="Pendiente de cobrar"
+                    value={formatCurrency(erpSummary.pendingInvoiceTotal)}
+                  />
+                  <InfoMetric
+                    label="Abonos activos"
+                    value={formatCurrency(erpSummary.creditNoteTotal)}
+                  />
+                  <InfoMetric
+                    label="Tesorería estimada"
+                    value={formatCurrency(erpSummary.treasuryBalance)}
+                  />
+                </div>
                 {data.invoices.map((invoice) => {
                   const job = data.jobs.find((entry) => entry.id === invoice.jobId);
                   const client = job?.clientId ? clientsById.get(job.clientId) : undefined;
@@ -4003,6 +4205,38 @@ function Index() {
                     </div>
                   );
                 })}
+                <div className="rounded-md border">
+                  <div className="border-b bg-secondary/25 px-3 py-2">
+                    <p className="text-sm font-medium">Facturas de abono</p>
+                    <p className="text-xs text-muted-foreground">
+                      Ajustes y devoluciones asociados a facturas emitidas.
+                    </p>
+                  </div>
+                  <div className="divide-y">
+                    {data.creditNotes.map((creditNote) => {
+                      const invoice = data.invoices.find(
+                        (entry) => entry.id === creditNote.invoiceId,
+                      );
+                      return (
+                        <div
+                          key={creditNote.id}
+                          className="grid gap-2 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium">
+                              {creditNote.reference} · {invoice?.invoiceNumber ?? "-"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{creditNote.reason}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{creditNote.status}</Badge>
+                            <p className="font-semibold">{formatCurrency(creditNote.total)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -4145,6 +4379,24 @@ function Index() {
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Compras sin justificante</span>
+                          <Badge
+                            variant={
+                              erpSummary.missingPurchaseReceipts > 0
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {erpSummary.missingPurchaseReceipts}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">Pago a proveedores</span>
+                          <span className="font-semibold">
+                            {formatCurrency(erpSummary.pendingPurchaseTotal)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">IVA neto estimado</span>
                           <span className="font-semibold">
                             {formatCurrency(fiscalSummary.vatDue)}
@@ -4171,7 +4423,7 @@ function Index() {
               <CardHeader>
                 <CardTitle>Informes</CardTitle>
                 <CardDescription>
-                  Estado operativo, facturación y averías repetidas.
+                  Estado operativo, facturación, tesorería, compras, stock e impuestos.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -4211,6 +4463,27 @@ function Index() {
                 <InfoMetric
                   label="Margen estimado"
                   value={formatCurrency(jobs.reduce((sum, job) => sum + job.totals.grossMargin, 0))}
+                />
+                <InfoMetric
+                  label="Compras proveedor"
+                  value={formatCurrency(erpSummary.purchaseTotal)}
+                />
+                <InfoMetric
+                  label="Pendiente proveedores"
+                  value={formatCurrency(erpSummary.pendingPurchaseTotal)}
+                />
+                <InfoMetric
+                  label="Valoración stock"
+                  value={formatCurrency(erpSummary.stockCostValue)}
+                />
+                <InfoMetric label="Stock bajo mínimos" value={String(erpSummary.lowStockCount)} />
+                <InfoMetric
+                  label="IVA estimado trimestre"
+                  value={formatCurrency(fiscalSummary.vatDue)}
+                />
+                <InfoMetric
+                  label="Resultado aproximado"
+                  value={formatCurrency(fiscalSummary.estimatedResult)}
                 />
               </CardContent>
             </Card>

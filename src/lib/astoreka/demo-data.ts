@@ -3,6 +3,7 @@ import type {
   AppData,
   Asset,
   Client,
+  CreditNote,
   Estimate,
   Expense,
   Invoice,
@@ -10,6 +11,8 @@ import type {
   JobEvent,
   KnowledgeEntry,
   Material,
+  PurchaseDocument,
+  Supplier,
 } from "./types";
 
 function nowIso() {
@@ -533,6 +536,103 @@ const expenses: Expense[] = [
   },
 ];
 
+const suppliers: Supplier[] = [
+  {
+    id: "sp-1",
+    name: "Recambios Norte",
+    nif: "B48911223",
+    phone: "+34 944 111 222",
+    email: "pedidos@recambiosnorte.example",
+    address: "Polígono Ugaldeguren 8, Zamudio",
+    category: "materiales",
+    paymentTerms: "Transferencia 30 días",
+    notes: "Proveedor principal para lavadoras y pequeños electrodomésticos.",
+  },
+  {
+    id: "sp-2",
+    name: "LuzPro",
+    nif: "B95770110",
+    phone: "+34 944 333 444",
+    email: "ventas@luzpro.example",
+    address: "Calle Industria 4, Gernika",
+    category: "materiales",
+    paymentTerms: "Contado",
+    notes: "Stock de drivers y tubos LED.",
+  },
+  {
+    id: "sp-3",
+    name: "Gasolinera Busturia",
+    nif: "B48111999",
+    phone: "+34 946 555 111",
+    email: "admin@gasobusturia.example",
+    address: "BI-2235, Busturia",
+    category: "vehiculo",
+    paymentTerms: "Tarjeta",
+    notes: "Combustible furgoneta técnica.",
+  },
+];
+
+const purchases: PurchaseDocument[] = [
+  {
+    id: "po-1",
+    supplierId: "sp-1",
+    type: "pedido_proveedor",
+    reference: "PED-PRO-2026-014",
+    status: "pendiente",
+    date: new Date().toISOString().slice(0, 10),
+    dueDate: new Date().toISOString().slice(0, 10),
+    subtotal: 132,
+    vat: 27.72,
+    total: 159.72,
+    linkedJobId: "jb-2",
+    receiptAttached: false,
+    notes: "Bomba desagüe y consumibles para reparación pendiente.",
+  },
+  {
+    id: "po-2",
+    supplierId: "sp-2",
+    type: "factura_proveedor",
+    reference: "FP-2026-088",
+    status: "pagado",
+    date: new Date().toISOString().slice(0, 10),
+    dueDate: new Date().toISOString().slice(0, 10),
+    subtotal: 96,
+    vat: 20.16,
+    total: 116.16,
+    linkedJobId: "jb-5",
+    receiptAttached: true,
+    notes: "Factura recibida y lista para libro de facturas recibidas.",
+  },
+  {
+    id: "po-3",
+    supplierId: "sp-3",
+    type: "ticket",
+    reference: "TK-2026-441",
+    status: "pagado",
+    date: new Date().toISOString().slice(0, 10),
+    dueDate: new Date().toISOString().slice(0, 10),
+    subtotal: 58.2,
+    vat: 12.22,
+    total: 70.42,
+    receiptAttached: false,
+    notes: "Ticket pendiente de adjuntar foto.",
+  },
+];
+
+const creditNotes: CreditNote[] = [
+  {
+    id: "cn-1",
+    invoiceId: "inv-1",
+    reference: "ABO-2026-004",
+    status: "borrador",
+    date: new Date().toISOString().slice(0, 10),
+    reason: "Ajuste pendiente si el cliente devuelve una pieza no instalada.",
+    subtotal: 12,
+    vat: 2.52,
+    total: 14.52,
+  },
+];
+
 const events: JobEvent[] = jobs.flatMap((job) => [
   {
     id: `ev-${job.id}-1`,
@@ -578,6 +678,9 @@ export const demoAppData: AppData = {
   invoices,
   estimates,
   expenses,
+  suppliers,
+  purchases,
+  creditNotes,
   events,
   knowledge,
   sequence: 6,

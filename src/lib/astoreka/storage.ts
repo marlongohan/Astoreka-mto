@@ -65,6 +65,10 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function asArrayOr<T>(value: unknown, fallback: T[]): T[] {
+  return Array.isArray(value) ? (value as T[]) : fallback;
+}
+
 function asNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -105,15 +109,18 @@ export function normalizeAppData(value: unknown): AppData {
   const record = asRecord(value);
   return {
     ...demoAppData,
-    clients: asArray(record.clients) as AppData["clients"],
-    assets: asArray(record.assets) as AppData["assets"],
-    materials: asArray(record.materials) as AppData["materials"],
-    jobs: normalizeJobs(record.jobs),
-    invoices: asArray(record.invoices) as AppData["invoices"],
-    estimates: asArray(record.estimates) as AppData["estimates"],
-    expenses: asArray(record.expenses) as AppData["expenses"],
-    events: asArray(record.events) as AppData["events"],
-    knowledge: asArray(record.knowledge) as AppData["knowledge"],
+    clients: asArrayOr(record.clients, demoAppData.clients),
+    assets: asArrayOr(record.assets, demoAppData.assets),
+    materials: asArrayOr(record.materials, demoAppData.materials),
+    jobs: Array.isArray(record.jobs) ? normalizeJobs(record.jobs) : demoAppData.jobs,
+    invoices: asArrayOr(record.invoices, demoAppData.invoices),
+    estimates: asArrayOr(record.estimates, demoAppData.estimates),
+    expenses: asArrayOr(record.expenses, demoAppData.expenses),
+    suppliers: asArrayOr(record.suppliers, demoAppData.suppliers),
+    purchases: asArrayOr(record.purchases, demoAppData.purchases),
+    creditNotes: asArrayOr(record.creditNotes, demoAppData.creditNotes),
+    events: asArrayOr(record.events, demoAppData.events),
+    knowledge: asArrayOr(record.knowledge, demoAppData.knowledge),
     sequence: asNumber(record.sequence, demoAppData.sequence),
   };
 }
