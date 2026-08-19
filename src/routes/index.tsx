@@ -106,6 +106,7 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "agenda", label: "Agenda", icon: CalendarDays },
   { key: "clientes", label: "Clientes", icon: Users },
   { key: "equipos", label: "Equipos", icon: Hammer },
+  { key: "presupuestos", label: "Presupuestos", icon: FileText },
   { key: "facturas", label: "Facturas / Cobros", icon: Euro },
   { key: "administracion", label: "Administración", icon: FileDown },
 ];
@@ -2759,6 +2760,9 @@ function Index() {
                                 <span className="truncate text-muted-foreground">
                                   {job.symptoms}
                                 </span>
+                                <span className="col-span-2">
+                                  <WorkStatusBadge status={job.status} />
+                                </span>
                               </span>
                             </Button>
                           ))}
@@ -3866,6 +3870,74 @@ function Index() {
                       <p>Cliente: {owner?.name ?? "-"}</p>
                       <p>Categoría: {asset.category}</p>
                       <p>Averías/trabajos: {history.length}</p>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          {section === "presupuestos" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Presupuestos</CardTitle>
+                <CardDescription>
+                  Nacen desde trabajo, con cálculo completo y WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {data.estimates.map((estimate) => {
+                  const job = data.jobs.find((entry) => entry.id === estimate.jobId);
+                  const client = data.clients.find((entry) => entry.id === estimate.clientId);
+                  const estimateWhatsAppHref = job
+                    ? getWhatsAppHref(job.id, "presupuesto")
+                    : undefined;
+                  return (
+                    <div
+                      key={estimate.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border p-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {job?.code} · {client?.name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          Estado: {estimate.status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{formatCurrency(estimate.total)}</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => job && openPrintableDocument("presupuesto", job.id)}
+                        >
+                          PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild={Boolean(estimateWhatsAppHref)}
+                          onClick={
+                            estimateWhatsAppHref || !job
+                              ? undefined
+                              : () => void prepareDocumentForWhatsApp("presupuesto", job.id)
+                          }
+                        >
+                          {estimateWhatsAppHref && job ? (
+                            <a
+                              href={estimateWhatsAppHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => void prepareDocumentForWhatsApp("presupuesto", job.id)}
+                            >
+                              WhatsApp PDF
+                            </a>
+                          ) : (
+                            "WhatsApp PDF"
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}

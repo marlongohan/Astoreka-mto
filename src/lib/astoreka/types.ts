@@ -291,5 +291,6 @@ export type MainSection =
   | "agenda"
   | "clientes"
   | "equipos"
+  | "presupuestos"
   | "facturas"
   | "administracion";
