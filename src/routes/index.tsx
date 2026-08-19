@@ -95,6 +95,7 @@ import type {
   JobMaterialLine,
   MainSection,
   Material,
+  WorkGroup,
   WorkPriority,
   WorkStatus,
 } from "@/lib/astoreka/types";
@@ -113,6 +114,14 @@ const NAV_ITEM_KEYS = NAV_ITEMS.map((item) => item.key);
 const MOBILE_PRIMARY_SECTIONS: MainSection[] = ["inicio", "trabajos", "agenda"];
 const MOBILE_COMPACT_LABELS: Partial<Record<MainSection, string>> = {
   inicio: "Inicio",
+};
+const KANBAN_DROP_STATUS: Record<WorkGroup, WorkStatus> = {
+  entrada: "nuevo",
+  planificacion: "programado",
+  ejecucion: "en_curso",
+  presupuesto: "presupuestado",
+  cierre: "realizado",
+  incidencias: "pendiente_pieza",
 };
 const ASTOREKA_LOGO_SRC = "/brand/astoreka-oak-logo.jpg";
 
@@ -259,6 +268,8 @@ function Index() {
   const [section, setSection] = useState<MainSection>("inicio");
   const [data, setData] = useState<AppData>(demoAppData);
   const [query, setQuery] = useState("");
+  const [draggingJobId, setDraggingJobId] = useState<string | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<WorkGroup | null>(null);
   const [statusFilter, setStatusFilter] = useState<WorkStatus | "todos">("todos");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedJobTab, setSelectedJobTab] = useState("resumen");
@@ -1129,6 +1140,19 @@ function Index() {
       );
       return next;
     });
+  };
+
+  const moveJobToKanbanGroup = (jobId: string, group: WorkGroup) => {
+    const job = jobs.find((item) => item.id === jobId);
+    const nextStatus = KANBAN_DROP_STATUS[group];
+    setDraggingJobId(null);
+    setDragOverGroup(null);
+
+    if (!job || job.status === nextStatus) {
+      return;
+    }
+
+    updateJobStatus(jobId, nextStatus);
   };
 
   const scheduleVisit = () => {
@@ -2683,35 +2707,65 @@ function Index() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
-                  {Object.entries(jobsByGroup).map(([groupKey, groupJobs]) => (
-                    <div
-                      key={groupKey}
-                      className="min-h-[124px] space-y-2 rounded-md border bg-secondary/30 p-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium">
-                          {GROUP_LABELS[groupKey as keyof typeof GROUP_LABELS]}
-                        </p>
-                        <Badge variant="outline">{groupJobs.length}</Badge>
+                  {Object.entries(jobsByGroup).map(([groupKey, groupJobs]) => {
+                    const group = groupKey as WorkGroup;
+                    const isDragTarget = dragOverGroup === group;
+                    return (
+                      <div
+                        key={group}
+                        className={`min-h-[124px] space-y-2 rounded-md border bg-secondary/30 p-2 transition-colors ${
+                          isDragTarget ? "border-primary bg-primary/10 ring-1 ring-primary/30" : ""
+                        }`}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setDragOverGroup(group);
+                        }}
+                        onDragLeave={() => setDragOverGroup(null)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
+                          if (jobId) {
+                            moveJobToKanbanGroup(jobId, group);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{GROUP_LABELS[group]}</p>
+                          <Badge variant="outline">{groupJobs.length}</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {groupJobs.slice(0, 4).map((job) => (
+                            <Button
+                              key={job.id}
+                              variant="outline"
+                              size="sm"
+                              draggable
+                              className={`h-auto w-full min-w-0 cursor-grab justify-start rounded-sm bg-card p-2 text-left shadow-none active:cursor-grabbing ${
+                                draggingJobId === job.id ? "opacity-60 ring-1 ring-primary/40" : ""
+                              }`}
+                              onClick={() => openJob(job.id)}
+                              onDragStart={(event) => {
+                                setDraggingJobId(job.id);
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData("text/plain", job.id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggingJobId(null);
+                                setDragOverGroup(null);
+                              }}
+                            >
+                              <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                                <span className="font-medium">{job.code}</span>
+                                <span className="truncate text-muted-foreground">
+                                  {job.symptoms}
+                                </span>
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        {groupJobs.slice(0, 4).map((job) => (
-                          <Button
-                            key={job.id}
-                            variant="outline"
-                            size="sm"
-                            className="h-auto w-full min-w-0 justify-start rounded-sm bg-card p-2 text-left shadow-none"
-                            onClick={() => openJob(job.id)}
-                          >
-                            <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
-                              <span className="font-medium">{job.code}</span>
-                              <span className="truncate text-muted-foreground">{job.symptoms}</span>
-                            </span>
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
 
