@@ -1,5 +1,3 @@
-export type UserRole = "admin" | "oficina" | "tecnico" | "solo_lectura";
-
 export type WorkStatus =
   | "nuevo"
   | "pendiente_datos"
@@ -53,11 +51,7 @@ export type ExpenseCategory =
   "materiales" | "herramientas" | "vehiculo" | "gestoria" | "software" | "seguros" | "otros";
 
 export type PurchaseDocumentType =
-  | "pedido_proveedor"
-  | "albaran_proveedor"
-  | "factura_proveedor"
-  | "recibo_proveedor"
-  | "ticket";
+  "pedido_proveedor" | "albaran_proveedor" | "factura_proveedor" | "recibo_proveedor" | "ticket";
 
 export type PurchaseStatus = "borrador" | "pendiente" | "recibido" | "facturado" | "pagado";
 
@@ -297,11 +291,5 @@ export type MainSection =
   | "agenda"
   | "clientes"
   | "equipos"
-  | "stock"
-  | "compras"
-  | "presupuestos"
-  | "partes"
   | "facturas"
-  | "administracion"
-  | "informes"
-  | "ajustes";
+  | "administracion";

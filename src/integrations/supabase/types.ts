@@ -32,6 +32,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      astoreka_records: {
+        Row: {
+          created_at: string;
+          data: Json;
+          entity: string;
+          owner_id: string;
+          record_id: string;
+          record_key: string;
+          sync_token: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          data: Json;
+          entity: string;
+          owner_id: string;
+          record_id: string;
+          record_key?: never;
+          sync_token: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          data?: Json;
+          entity?: string;
+          owner_id?: string;
+          record_id?: string;
+          record_key?: never;
+          sync_token?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       assets: {
         Row: {
           address: string | null;

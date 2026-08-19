@@ -1,13 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BellRing,
-  Building2,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Cloud,
-  ClipboardCheck,
   Copy,
   FileDown,
   Euro,
@@ -17,17 +14,12 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
-  Package,
   Phone,
   Plus,
-  ReceiptText,
   RefreshCcw,
-  Save,
   Search,
-  ShoppingCart,
   TriangleAlert,
   Users,
-  Warehouse,
   Wrench,
 } from "lucide-react";
 
@@ -86,11 +78,7 @@ import {
   signOutFromCloud,
   type CloudSyncState,
 } from "@/lib/astoreka/cloud-storage";
-import {
-  emitOperationalEvent,
-  getQueuedN8nEvents,
-  isN8nConfigured,
-} from "@/lib/astoreka/integrations";
+import { emitOperationalEvent } from "@/lib/astoreka/integrations";
 import {
   createStatusEvent,
   isCloudConfigured,
@@ -117,14 +105,8 @@ const NAV_ITEMS: Array<{ key: MainSection; label: string; icon: typeof LayoutDas
   { key: "agenda", label: "Agenda", icon: CalendarDays },
   { key: "clientes", label: "Clientes", icon: Users },
   { key: "equipos", label: "Equipos", icon: Hammer },
-  { key: "stock", label: "Stock", icon: Package },
-  { key: "compras", label: "Compras", icon: ShoppingCart },
-  { key: "presupuestos", label: "Presupuestos", icon: FileText },
-  { key: "partes", label: "Partes", icon: ClipboardCheck },
   { key: "facturas", label: "Facturas / Cobros", icon: Euro },
   { key: "administracion", label: "Administración", icon: FileDown },
-  { key: "informes", label: "Informes", icon: BellRing },
-  { key: "ajustes", label: "Ajustes", icon: Save },
 ];
 
 const NAV_ITEM_KEYS = NAV_ITEMS.map((item) => item.key);
@@ -455,8 +437,6 @@ function Index() {
     () => jobs.find((job) => job.id === scheduleDraft.jobId),
     [jobs, scheduleDraft.jobId],
   );
-  const queuedN8nEvents = getQueuedN8nEvents().length;
-
   const focusDiagnosisField = () => {
     setSelectedJobTab("resumen");
 
@@ -586,7 +566,13 @@ function Index() {
       pendingInvoiceTotal,
       treasuryBalance: fiscalSummary.collectedTotal - pendingPurchaseTotal,
     };
-  }, [data.creditNotes, data.invoices, data.materials, data.purchases, fiscalSummary.collectedTotal]);
+  }, [
+    data.creditNotes,
+    data.invoices,
+    data.materials,
+    data.purchases,
+    fiscalSummary.collectedTotal,
+  ]);
 
   const jobsByGroup = useMemo(() => {
     return {
@@ -1881,10 +1867,8 @@ function Index() {
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>n8n</span>
-                  <Badge variant={isN8nConfigured() ? "default" : "outline"}>
-                    {isN8nConfigured() ? "activo" : queuedN8nEvents}
-                  </Badge>
+                  <span>Modo</span>
+                  <Badge variant="secondary">simple</Badge>
                 </div>
               </div>
             </div>
@@ -1911,13 +1895,11 @@ function Index() {
                         ? "Supabase listo"
                         : "Local primero"}
                   </Badge>
-                  <Badge variant={isN8nConfigured() ? "default" : "outline"}>
-                    {isN8nConfigured() ? "n8n activo" : `n8n cola ${queuedN8nEvents}`}
-                  </Badge>
+                  <Badge variant="secondary">Monousuario</Badge>
                 </div>
               </div>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Bandeja de avisos, trabajos, materiales y cobros para mantenimiento técnico.
+                Avisos, agenda, trabajos, facturas y administración para una operación sencilla.
               </p>
               {quickActions}
             </div>
@@ -2075,7 +2057,7 @@ function Index() {
                   <DialogHeader>
                     <DialogTitle>Nuevo</DialogTitle>
                     <DialogDescription>
-                      Crear aviso, trabajo, cliente, equipo, presupuesto, cita o material.
+                      Crear aviso, presupuesto, cliente, equipo o cita.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -2088,7 +2070,6 @@ function Index() {
                       <TabsTrigger value="presupuesto">Presupuesto</TabsTrigger>
                       <TabsTrigger value="cliente">Cliente</TabsTrigger>
                       <TabsTrigger value="equipo">Equipo</TabsTrigger>
-                      <TabsTrigger value="material">Material</TabsTrigger>
                       <TabsTrigger value="cita">Cita</TabsTrigger>
                     </TabsList>
 
@@ -3838,285 +3819,6 @@ function Index() {
             </Card>
           )}
 
-          {section === "stock" && (
-            <section className="grid gap-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard
-                  label="Valor coste stock"
-                  value={formatCurrency(erpSummary.stockCostValue)}
-                  icon={Warehouse}
-                />
-                <KpiCard
-                  label="Valor venta stock"
-                  value={formatCurrency(erpSummary.stockSaleValue)}
-                  icon={Package}
-                />
-                <KpiCard
-                  label="Bajo mínimo"
-                  value={String(erpSummary.lowStockCount)}
-                  icon={TriangleAlert}
-                />
-                <KpiCard
-                  label="Proveedores activos"
-                  value={String(data.suppliers.length)}
-                  icon={Building2}
-                />
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Stock / Materiales</CardTitle>
-                  <CardDescription>
-                    Control de stock real, valoración, mínimo, margen y proveedor.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Material</TableHead>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Proveedor</TableHead>
-                        <TableHead>Cantidad</TableHead>
-                        <TableHead>Mínimo</TableHead>
-                        <TableHead>Coste</TableHead>
-                        <TableHead>Venta</TableHead>
-                        <TableHead>Margen</TableHead>
-                        <TableHead>Estado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.materials.map((material) => (
-                        <TableRow key={material.id}>
-                          <TableCell className="font-medium">{material.name}</TableCell>
-                          <TableCell>{material.sku}</TableCell>
-                          <TableCell>{material.provider}</TableCell>
-                          <TableCell>{material.quantity}</TableCell>
-                          <TableCell>{material.minimum}</TableCell>
-                          <TableCell>{formatCurrency(material.cost)}</TableCell>
-                          <TableCell>{formatCurrency(material.salePrice)}</TableCell>
-                          <TableCell>{formatCurrency(material.salePrice - material.cost)}</TableCell>
-                          <TableCell>
-                            {material.quantity <= material.minimum ? (
-                              <Badge variant="destructive">Bajo stock</Badge>
-                            ) : (
-                              <Badge variant="secondary">OK</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </section>
-          )}
-
-          {section === "compras" && (
-            <section className="grid gap-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard
-                  label="Compras registradas"
-                  value={formatCurrency(erpSummary.purchaseTotal)}
-                  icon={ShoppingCart}
-                />
-                <KpiCard
-                  label="Pendiente proveedor"
-                  value={formatCurrency(erpSummary.pendingPurchaseTotal)}
-                  icon={ReceiptText}
-                />
-                <KpiCard
-                  label="Docs sin justificante"
-                  value={String(erpSummary.missingPurchaseReceipts)}
-                  icon={TriangleAlert}
-                />
-                <KpiCard
-                  label="Proveedores"
-                  value={String(data.suppliers.length)}
-                  icon={Building2}
-                />
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Compras</CardTitle>
-                    <CardDescription>
-                      Pedidos, albaranes, facturas proveedor, recibos y tickets.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Documento</TableHead>
-                          <TableHead>Proveedor</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Trabajo</TableHead>
-                          <TableHead>Justificante</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.purchases.map((purchase) => {
-                          const supplier = data.suppliers.find(
-                            (entry) => entry.id === purchase.supplierId,
-                          );
-                          const linkedJob = purchase.linkedJobId
-                            ? data.jobs.find((entry) => entry.id === purchase.linkedJobId)
-                            : undefined;
-                          return (
-                            <TableRow key={purchase.id}>
-                              <TableCell>
-                                <p className="font-medium">{purchase.reference}</p>
-                                <p className="text-xs text-muted-foreground">{purchase.date}</p>
-                              </TableCell>
-                              <TableCell>{supplier?.name ?? "-"}</TableCell>
-                              <TableCell>{formatCompactLabel(purchase.type)}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={purchase.status === "pagado" ? "secondary" : "outline"}
-                                >
-                                  {formatCompactLabel(purchase.status)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{formatCurrency(purchase.total)}</TableCell>
-                              <TableCell>{linkedJob?.code ?? "-"}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={purchase.receiptAttached ? "secondary" : "destructive"}
-                                >
-                                  {purchase.receiptAttached ? "OK" : "Falta"}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Proveedores</CardTitle>
-                    <CardDescription>Datos mínimos para compras y facturas recibidas.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {data.suppliers.map((supplier) => (
-                      <div key={supplier.id} className="rounded-md border p-3 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-medium">{supplier.name}</p>
-                          <Badge variant="outline">{supplier.category}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{supplier.nif}</p>
-                        <p>{supplier.paymentTerms}</p>
-                        <p className="text-xs text-muted-foreground">{supplier.notes}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-            </section>
-          )}
-
-          {section === "presupuestos" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Presupuestos</CardTitle>
-                <CardDescription>
-                  Nacen desde trabajo, con cálculo completo y WhatsApp.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {data.estimates.map((estimate) => {
-                  const job = data.jobs.find((entry) => entry.id === estimate.jobId);
-                  const client = data.clients.find((entry) => entry.id === estimate.clientId);
-                  const estimateWhatsAppHref = job
-                    ? getWhatsAppHref(job.id, "presupuesto")
-                    : undefined;
-                  return (
-                    <div
-                      key={estimate.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border p-3 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {job?.code} · {client?.name}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          Estado: {estimate.status}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{formatCurrency(estimate.total)}</p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => job && openPrintableDocument("presupuesto", job.id)}
-                        >
-                          PDF
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild={Boolean(estimateWhatsAppHref)}
-                          onClick={
-                            estimateWhatsAppHref || !job
-                              ? undefined
-                              : () => void prepareDocumentForWhatsApp("presupuesto", job.id)
-                          }
-                        >
-                          {estimateWhatsAppHref && job ? (
-                            <a
-                              href={estimateWhatsAppHref}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={() => void prepareDocumentForWhatsApp("presupuesto", job.id)}
-                            >
-                              WhatsApp PDF
-                            </a>
-                          ) : (
-                            "WhatsApp PDF"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
-
-          {section === "partes" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Partes</CardTitle>
-                <CardDescription>
-                  Vista imprimible y cierre técnico con horas y materiales.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {data.jobs
-                  .filter((job) =>
-                    ["realizado", "facturado", "cobrado", "cerrado"].includes(job.status),
-                  )
-                  .map((job) => (
-                    <div key={job.id} className="rounded-md border p-3">
-                      <p className="font-medium">
-                        {job.code} · {job.serviceType}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {job.diagnosis || "Sin diagnóstico final"}
-                      </p>
-                      <p>Horas reales: {job.realHours || 0}</p>
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-          )}
-
           {section === "facturas" && (
             <Card>
               <CardHeader>
@@ -4382,9 +4084,7 @@ function Index() {
                           <span className="text-muted-foreground">Compras sin justificante</span>
                           <Badge
                             variant={
-                              erpSummary.missingPurchaseReceipts > 0
-                                ? "destructive"
-                                : "secondary"
+                              erpSummary.missingPurchaseReceipts > 0 ? "destructive" : "secondary"
                             }
                           >
                             {erpSummary.missingPurchaseReceipts}
@@ -4416,109 +4116,6 @@ function Index() {
                 </CardContent>
               </Card>
             </section>
-          )}
-
-          {section === "informes" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Informes</CardTitle>
-                <CardDescription>
-                  Estado operativo, facturación, tesorería, compras, stock e impuestos.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <InfoMetric
-                  label="Trabajos abiertos"
-                  value={String(
-                    jobs.filter((job) => job.status !== "cerrado" && job.status !== "cancelado")
-                      .length,
-                  )}
-                />
-                <InfoMetric
-                  label="Trabajos cerrados"
-                  value={String(jobs.filter((job) => job.status === "cerrado").length)}
-                />
-                <InfoMetric
-                  label="Facturado mes"
-                  value={formatCurrency(
-                    data.invoices.reduce((sum, invoice) => sum + invoice.total, 0),
-                  )}
-                />
-                <InfoMetric
-                  label="Cobrado mes"
-                  value={formatCurrency(
-                    data.invoices
-                      .filter((invoice) => invoice.status === "cobrada")
-                      .reduce((sum, invoice) => sum + invoice.total, 0),
-                  )}
-                />
-                <InfoMetric
-                  label="Pendiente de cobrar"
-                  value={formatCurrency(
-                    data.invoices
-                      .filter((invoice) => invoice.status !== "cobrada")
-                      .reduce((sum, invoice) => sum + invoice.total, 0),
-                  )}
-                />
-                <InfoMetric
-                  label="Margen estimado"
-                  value={formatCurrency(jobs.reduce((sum, job) => sum + job.totals.grossMargin, 0))}
-                />
-                <InfoMetric
-                  label="Compras proveedor"
-                  value={formatCurrency(erpSummary.purchaseTotal)}
-                />
-                <InfoMetric
-                  label="Pendiente proveedores"
-                  value={formatCurrency(erpSummary.pendingPurchaseTotal)}
-                />
-                <InfoMetric
-                  label="Valoración stock"
-                  value={formatCurrency(erpSummary.stockCostValue)}
-                />
-                <InfoMetric label="Stock bajo mínimos" value={String(erpSummary.lowStockCount)} />
-                <InfoMetric
-                  label="IVA estimado trimestre"
-                  value={formatCurrency(fiscalSummary.vatDue)}
-                />
-                <InfoMetric
-                  label="Resultado aproximado"
-                  value={formatCurrency(fiscalSummary.estimatedResult)}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {section === "ajustes" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Ajustes</CardTitle>
-                <CardDescription>
-                  Roles, tarifas base y webhooks preparados para n8n.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="rounded-md border p-3">
-                  <p className="font-medium">Tarifas demo (EUR + IVA 21%)</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-                    <li>Salida local: {formatCurrency(TARIFFS.callOutLocal)}</li>
-                    <li>Salida extendida: {formatCurrency(TARIFFS.callOutExtended)}</li>
-                    <li>Hora estándar: {formatCurrency(TARIFFS.hourlyStandard)}</li>
-                    <li>Hora urgente: {formatCurrency(TARIFFS.hourlyUrgent)}</li>
-                    <li>Trabajo mínimo: {formatCurrency(TARIFFS.minimumWork)}</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-md border p-3">
-                  <p className="font-medium">Webhooks futuros (n8n)</p>
-                  <p className="text-muted-foreground">
-                    trabajo creado, trabajo asignado, visita programada, técnico en camino,
-                    presupuesto enviado, presupuesto aprobado, parte cerrado, factura pendiente,
-                    cobro recibido, stock bajo, próxima revisión.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           )}
         </div>
       </div>
