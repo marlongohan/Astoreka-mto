@@ -1878,17 +1878,28 @@ function Index() {
     setQuickActionMessage(`${job.code} marcado como cobrado.`);
   };
 
-  const refreshFromLogo = async () => {
-    if (isCloudConfigured()) {
-      await syncFromCloud();
-    }
+  const refreshFromLogo = () => {
+    setQuickActionMessage("Actualizando.");
 
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.update()));
-    }
+    const timeout = new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 1200);
+    });
 
-    window.location.reload();
+    void Promise.race([
+      (async () => {
+        if (isCloudConfigured()) {
+          await syncFromCloud();
+        }
+
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.update()));
+        }
+      })(),
+      timeout,
+    ]).finally(() => {
+      window.location.reload();
+    });
   };
 
   const quickActions = (
