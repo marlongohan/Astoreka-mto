@@ -276,6 +276,9 @@ function Index() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedJobTab, setSelectedJobTab] = useState("resumen");
   const diagnosisFieldRef = useRef<HTMLTextAreaElement>(null);
+  const lastLocalChangeAt = useRef(0);
+  const lastCloudUpdateAt = useRef("");
+  const cloudPullBusyRef = useRef(false);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudState, setCloudState] = useState<CloudSyncState>({
     status: isCloudConfigured() ? "signed-out" : "local",
@@ -384,11 +387,13 @@ function Index() {
         }
 
         if (snapshot) {
+          lastCloudUpdateAt.current = snapshot.updated_at;
           saveAppData(snapshot.data);
           setData(snapshot.data);
           setSelectedJobId(snapshot.data.jobs[0]?.id ?? "");
         } else {
-          await saveCloudAppData(initial);
+          const saved = await saveCloudAppData(initial);
+          lastCloudUpdateAt.current = saved?.updated_at ?? "";
         }
 
         setCloudState({
@@ -693,11 +698,13 @@ function Index() {
   const updateData = (updater: (prev: AppData) => AppData) => {
     setData((prev) => {
       const next = updater(prev);
+      lastLocalChangeAt.current = Date.now();
       saveAppData(next);
       if (isCloudConfigured()) {
         void saveCloudAppData(next)
           .then((snapshot) => {
             if (snapshot) {
+              lastCloudUpdateAt.current = snapshot.updated_at;
               setCloudState({
                 status: "ready",
                 userId: snapshot.owner_id,
@@ -750,11 +757,13 @@ function Index() {
       });
       const snapshot = await loadCloudAppData();
       if (snapshot) {
+        lastCloudUpdateAt.current = snapshot.updated_at;
         saveAppData(snapshot.data);
         setData(snapshot.data);
         setSelectedJobId(snapshot.data.jobs[0]?.id ?? "");
       } else {
-        await saveCloudAppData(data);
+        const saved = await saveCloudAppData(data);
+        lastCloudUpdateAt.current = saved?.updated_at ?? "";
       }
       setCloudState({
         status: "ready",
@@ -771,6 +780,74 @@ function Index() {
       setCloudBusy(false);
     }
   };
+
+  const pullCloudUpdatesQuietly = async (email: string) => {
+    if (!isCloudConfigured() || cloudPullBusyRef.current) {
+      return;
+    }
+
+    if (Date.now() - lastLocalChangeAt.current < 2500) {
+      return;
+    }
+
+    cloudPullBusyRef.current = true;
+    try {
+      const snapshot = await loadCloudAppData();
+      if (!snapshot || snapshot.updated_at === lastCloudUpdateAt.current) {
+        return;
+      }
+
+      lastCloudUpdateAt.current = snapshot.updated_at;
+      saveAppData(snapshot.data);
+      setData(snapshot.data);
+      setSelectedJobId((current) =>
+        snapshot.data.jobs.some((job) => job.id === current)
+          ? current
+          : (snapshot.data.jobs[0]?.id ?? ""),
+      );
+      setCloudState({
+        status: "ready",
+        userId: snapshot.owner_id,
+        email,
+        message: `Actualizado ${new Date(snapshot.updated_at).toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}.`,
+      });
+    } catch {
+      // El autosync no debe molestar al usuario si una comprobación puntual falla.
+    } finally {
+      cloudPullBusyRef.current = false;
+    }
+  };
+
+  const cloudReadyEmail = cloudState.status === "ready" ? cloudState.email : "";
+
+  useEffect(() => {
+    if (cloudState.status !== "ready") {
+      return;
+    }
+
+    const email = cloudReadyEmail;
+    const pull = () => void pullCloudUpdatesQuietly(email);
+    const intervalId = window.setInterval(pull, 30000);
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        pull();
+      }
+    };
+
+    window.addEventListener("focus", pull);
+    window.addEventListener("online", pull);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", pull);
+      window.removeEventListener("online", pull);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [cloudReadyEmail, cloudState.status]);
 
   const handleCloudSignIn = async () => {
     if (!cloudForm.email.trim() || cloudForm.password.length < 6) {
