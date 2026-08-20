@@ -637,6 +637,10 @@ function Index() {
         : new Set(agendaMonthDays.map(toDateKey));
     return agendaJobs.filter((job) => visibleKeys.has(getAgendaJobDateKey(job)));
   }, [agendaJobs, agendaMonthDays, agendaSelectedKey, agendaView, agendaWeekDays]);
+  const todayJobs = useMemo(
+    () => agendaJobs.filter((job) => getAgendaJobDateKey(job) === agendaTodayKey),
+    [agendaJobs, agendaTodayKey],
+  );
 
   const shiftAgendaDate = (direction: -1 | 1) => {
     const nextDate =
@@ -2038,7 +2042,7 @@ function Index() {
           </header>
 
           {isCloudConfigured() ? (
-            <section className="grid gap-3 rounded-lg border bg-card p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <section className="hidden gap-3 rounded-lg border bg-card p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="rounded-md border bg-background p-2">
                   <Cloud className="size-4" />
@@ -2776,7 +2780,48 @@ function Index() {
 
           {section === "inicio" && (
             <section className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <Card className="overflow-hidden lg:hidden">
+                <CardHeader className="border-b bg-secondary/20">
+                  <CardTitle>Trabajos de hoy</CardTitle>
+                  <CardDescription>Vista rápida para técnico en móvil.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {todayJobs.length > 0 ? (
+                    todayJobs.slice(0, 5).map((job) => {
+                      const client = job.clientId ? clientsById.get(job.clientId) : undefined;
+                      return (
+                        <button
+                          key={job.id}
+                          className="grid w-full gap-2 rounded-md border bg-card p-3 text-left shadow-sm"
+                          onClick={() => openJob(job.id)}
+                        >
+                          <span className="grid gap-2">
+                            <span className="min-w-0">
+                              <span className="block truncate font-semibold">
+                                {job.code} · {client?.name ?? "Sin cliente"}
+                              </span>
+                              <span className="mt-1 block truncate text-sm text-muted-foreground">
+                                {job.symptoms || job.serviceType}
+                              </span>
+                            </span>
+                            <WorkStatusBadge status={job.status} />
+                          </span>
+                          <span className="grid gap-1 text-xs text-muted-foreground">
+                            <span>{job.address || client?.address || "Sin dirección"}</span>
+                            <span>{getNextAction(job)}</span>
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-md border bg-secondary/30 p-3 text-sm text-muted-foreground">
+                      No hay trabajos programados para hoy.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="hidden gap-3 sm:grid-cols-2 lg:grid xl:grid-cols-5">
                 <KpiCard label="Trabajos abiertos" value={String(kpis.openJobs)} icon={Wrench} />
                 <KpiCard
                   label="Visitas de hoy"
@@ -2807,7 +2852,7 @@ function Index() {
                     Entrada, planificación, ejecución, presupuesto y cierre.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
+                <CardContent className="grid auto-cols-[minmax(170px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-4 lg:grid-flow-row lg:grid-cols-3 xl:grid-cols-6">
                   {Object.entries(jobsByGroup).map(([groupKey, groupJobs]) => {
                     const group = groupKey as WorkGroup;
                     const isDragTarget = dragOverGroup === group;
