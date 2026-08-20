@@ -1878,6 +1878,19 @@ function Index() {
     setQuickActionMessage(`${job.code} marcado como cobrado.`);
   };
 
+  const refreshFromLogo = async () => {
+    if (isCloudConfigured()) {
+      await syncFromCloud();
+    }
+
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+
+    window.location.reload();
+  };
+
   const quickActions = (
     <>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -1916,7 +1929,17 @@ function Index() {
         <aside className="hidden lg:sticky lg:top-4 lg:block lg:h-[calc(100vh-2rem)]">
           <div className="flex h-full flex-col rounded-lg border bg-sidebar p-3 shadow-sm">
             <div className="border-b pb-4">
-              <img src={ASTOREKA_LOGO_SRC} alt="Astoreka" className="h-16 w-auto object-contain" />
+              <button
+                aria-label="Actualizar Astoreka"
+                className="block border-0 bg-transparent p-0 text-left outline-none"
+                onClick={() => void refreshFromLogo()}
+              >
+                <img
+                  src={ASTOREKA_LOGO_SRC}
+                  alt="Astoreka"
+                  className="h-16 w-auto object-contain"
+                />
+              </button>
               <p className="text-xs font-medium uppercase text-muted-foreground">MTO operations</p>
             </div>
 
@@ -1964,11 +1987,17 @@ function Index() {
         <div className="flex min-w-0 flex-col gap-4">
           <header className="rounded-lg border bg-card p-4 shadow-sm">
             <div className="min-w-0">
-              <img
-                src={ASTOREKA_LOGO_SRC}
-                alt="Astoreka MTO"
-                className="mb-3 h-14 w-auto object-contain lg:hidden"
-              />
+              <button
+                aria-label="Actualizar Astoreka"
+                className="mb-3 block border-0 bg-transparent p-0 text-left outline-none lg:hidden"
+                onClick={() => void refreshFromLogo()}
+              >
+                <img
+                  src={ASTOREKA_LOGO_SRC}
+                  alt="Astoreka MTO"
+                  className="h-14 w-auto object-contain"
+                />
+              </button>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
                   Centro operativo
