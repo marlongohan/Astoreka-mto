@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -271,6 +271,7 @@ function Index() {
   const [query, setQuery] = useState("");
   const [draggingJobId, setDraggingJobId] = useState<string | null>(null);
   const [dragOverGroup, setDragOverGroup] = useState<WorkGroup | null>(null);
+  const [dragOverAgendaDate, setDragOverAgendaDate] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<WorkStatus | "todos">("todos");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedJobTab, setSelectedJobTab] = useState("resumen");
@@ -1148,12 +1149,72 @@ function Index() {
     const nextStatus = KANBAN_DROP_STATUS[group];
     setDraggingJobId(null);
     setDragOverGroup(null);
+    setDragOverAgendaDate(null);
 
     if (!job || job.status === nextStatus) {
       return;
     }
 
     updateJobStatus(jobId, nextStatus);
+  };
+
+  const startJobDrag = (event: DragEvent<HTMLElement>, jobId: string) => {
+    setDraggingJobId(jobId);
+    setDragOverGroup(null);
+    setDragOverAgendaDate(null);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", jobId);
+  };
+
+  const finishJobDrag = () => {
+    setDraggingJobId(null);
+    setDragOverGroup(null);
+    setDragOverAgendaDate(null);
+  };
+
+  const moveJobToAgendaDate = (jobId: string, dateKey: string) => {
+    setAgendaDate(dateKey);
+    finishJobDrag();
+
+    updateData((prev) => {
+      const source = prev.jobs.find((job) => job.id === jobId);
+      if (!source || source.scheduledAt === dateKey) {
+        return prev;
+      }
+
+      const terminalStatuses: WorkStatus[] = [
+        "realizado",
+        "facturado",
+        "cobrado",
+        "cerrado",
+        "cancelado",
+      ];
+      const updatedJob = {
+        ...source,
+        scheduledAt: dateKey,
+        status: terminalStatuses.includes(source.status) ? source.status : ("programado" as const),
+      };
+      const event = createStatusEvent(
+        updatedJob,
+        source.status,
+        `Visita movida en agenda a ${dateKey}`,
+      );
+      const next = {
+        ...prev,
+        jobs: prev.jobs.map((job) => (job.id === jobId ? updatedJob : job)),
+        events: [event, ...prev.events],
+      };
+      void emitOperationalEvent("job_status_changed", updatedJob, next);
+      return next;
+    });
+  };
+
+  const dropJobOnAgendaDate = (event: DragEvent<HTMLElement>, dateKey: string) => {
+    event.preventDefault();
+    const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
+    if (jobId) {
+      moveJobToAgendaDate(jobId, dateKey);
+    }
   };
 
   const scheduleVisit = () => {
@@ -2745,15 +2806,8 @@ function Index() {
                                 draggingJobId === job.id ? "opacity-60 ring-1 ring-primary/40" : ""
                               }`}
                               onClick={() => openJob(job.id)}
-                              onDragStart={(event) => {
-                                setDraggingJobId(job.id);
-                                event.dataTransfer.effectAllowed = "move";
-                                event.dataTransfer.setData("text/plain", job.id);
-                              }}
-                              onDragEnd={() => {
-                                setDraggingJobId(null);
-                                setDragOverGroup(null);
-                              }}
+                              onDragStart={(event) => startJobDrag(event, job.id)}
+                              onDragEnd={finishJobDrag}
                             >
                               <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
                                 <span className="font-medium">{job.code}</span>
@@ -3560,8 +3614,20 @@ function Index() {
                         const dateKey = toDateKey(day);
                         const dayJobs = agendaJobsByDate.get(dateKey) ?? [];
                         const isToday = dateKey === agendaTodayKey;
+                        const isAgendaDropTarget = dragOverAgendaDate === dateKey;
                         return (
-                          <div key={dateKey} className="min-h-[560px] border-r last:border-r-0">
+                          <div
+                            key={dateKey}
+                            className={`min-h-[560px] border-r transition-colors last:border-r-0 ${
+                              isAgendaDropTarget ? "bg-primary/10 ring-1 ring-primary/30" : ""
+                            }`}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverAgendaDate(dateKey);
+                            }}
+                            onDragLeave={() => setDragOverAgendaDate(null)}
+                            onDrop={(event) => dropJobOnAgendaDate(event, dateKey)}
+                          >
                             <div
                               className={`sticky top-0 z-10 border-b bg-background px-3 py-2 ${
                                 isToday ? "bg-primary/5" : ""
@@ -3610,8 +3676,15 @@ function Index() {
                                 dayJobs.map((job) => (
                                   <button
                                     key={job.id}
-                                    className={`block w-full min-w-0 rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                    draggable
+                                    className={`block w-full min-w-0 cursor-grab rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 active:cursor-grabbing ${STATUS_CLASS[job.status]} ${
+                                      draggingJobId === job.id
+                                        ? "opacity-60 ring-1 ring-primary/40"
+                                        : ""
+                                    }`}
                                     onClick={() => openJobFromAgenda(job.id)}
+                                    onDragStart={(event) => startJobDrag(event, job.id)}
+                                    onDragEnd={finishJobDrag}
                                   >
                                     <p className="truncate font-semibold">
                                       {getAgendaClientName(job)}
@@ -3647,14 +3720,23 @@ function Index() {
                         const isCurrentMonth = day.getMonth() === agendaBaseDate.getMonth();
                         const isToday = dateKey === agendaTodayKey;
                         const isSelected = dateKey === agendaSelectedKey;
+                        const isAgendaDropTarget = dragOverAgendaDate === dateKey;
                         return (
                           <div
                             key={dateKey}
-                            className={`min-h-28 border-r border-b p-2 text-left last:border-r-0 ${
+                            className={`min-h-28 border-r border-b p-2 text-left transition-colors last:border-r-0 ${
                               isCurrentMonth
                                 ? "bg-background"
                                 : "bg-secondary/25 text-muted-foreground"
-                            } ${isSelected ? "ring-2 ring-primary ring-inset" : ""}`}
+                            } ${isSelected ? "ring-2 ring-primary ring-inset" : ""} ${
+                              isAgendaDropTarget ? "bg-primary/10 ring-1 ring-primary/30" : ""
+                            }`}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverAgendaDate(dateKey);
+                            }}
+                            onDragLeave={() => setDragOverAgendaDate(null)}
+                            onDrop={(event) => dropJobOnAgendaDate(event, dateKey)}
                           >
                             <button
                               className="flex w-full items-center justify-between gap-1 rounded-sm hover:text-primary"
@@ -3675,8 +3757,15 @@ function Index() {
                               {dayJobs.slice(0, 3).map((job) => (
                                 <button
                                   key={job.id}
-                                  className={`block w-full truncate rounded-sm border px-1.5 py-1 text-left text-xs font-medium hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                  draggable
+                                  className={`block w-full cursor-grab truncate rounded-sm border px-1.5 py-1 text-left text-xs font-medium hover:ring-1 hover:ring-primary/40 active:cursor-grabbing ${STATUS_CLASS[job.status]} ${
+                                    draggingJobId === job.id
+                                      ? "opacity-60 ring-1 ring-primary/40"
+                                      : ""
+                                  }`}
                                   onClick={() => openJobFromAgenda(job.id)}
+                                  onDragStart={(event) => startJobDrag(event, job.id)}
+                                  onDragEnd={finishJobDrag}
                                 >
                                   {getAgendaClientName(job)}
                                 </button>
@@ -3696,7 +3785,17 @@ function Index() {
                     </div>
                   </div>
                 ) : agendaView === "dia" ? (
-                  <div className="space-y-3 px-4 pb-4">
+                  <div
+                    className={`space-y-3 px-4 pb-4 transition-colors ${
+                      dragOverAgendaDate === agendaSelectedKey ? "bg-primary/5" : ""
+                    }`}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragOverAgendaDate(agendaSelectedKey);
+                    }}
+                    onDragLeave={() => setDragOverAgendaDate(null)}
+                    onDrop={(event) => dropJobOnAgendaDate(event, agendaSelectedKey)}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-secondary/25 p-3">
                       <div>
                         <p className="text-sm font-semibold">
@@ -3718,7 +3817,15 @@ function Index() {
                     ) : (
                       <div className="grid gap-2 lg:grid-cols-2">
                         {agendaSelectedJobs.map((job) => (
-                          <div key={job.id} className="rounded-md border bg-card p-3">
+                          <div
+                            key={job.id}
+                            draggable
+                            className={`cursor-grab rounded-md border bg-card p-3 active:cursor-grabbing ${
+                              draggingJobId === job.id ? "opacity-60 ring-1 ring-primary/40" : ""
+                            }`}
+                            onDragStart={(event) => startJobDrag(event, job.id)}
+                            onDragEnd={finishJobDrag}
+                          >
                             <button
                               className="block w-full text-left"
                               onClick={() => openJobFromAgenda(job.id)}
@@ -3776,7 +3883,17 @@ function Index() {
                         </div>
                       </div>
                       {agendaSelectedJobs.length > 0 ? (
-                        <div className="grid grid-cols-[72px_minmax(0,1fr)] border-b">
+                        <div
+                          className={`grid grid-cols-[72px_minmax(0,1fr)] border-b transition-colors ${
+                            dragOverAgendaDate === agendaSelectedKey ? "bg-primary/5" : ""
+                          }`}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            setDragOverAgendaDate(agendaSelectedKey);
+                          }}
+                          onDragLeave={() => setDragOverAgendaDate(null)}
+                          onDrop={(event) => dropJobOnAgendaDate(event, agendaSelectedKey)}
+                        >
                           <div className="border-r px-3 py-3 text-xs font-medium text-muted-foreground">
                             Todo día
                           </div>
@@ -3784,8 +3901,15 @@ function Index() {
                             {agendaSelectedJobs.map((job) => (
                               <button
                                 key={job.id}
-                                className={`min-w-40 rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 ${STATUS_CLASS[job.status]}`}
+                                draggable
+                                className={`min-w-40 cursor-grab rounded-sm border px-2 py-1.5 text-left text-xs shadow-sm hover:ring-1 hover:ring-primary/40 active:cursor-grabbing ${STATUS_CLASS[job.status]} ${
+                                  draggingJobId === job.id
+                                    ? "opacity-60 ring-1 ring-primary/40"
+                                    : ""
+                                }`}
                                 onClick={() => openJobFromAgenda(job.id)}
+                                onDragStart={(event) => startJobDrag(event, job.id)}
+                                onDragEnd={finishJobDrag}
                               >
                                 <p className="truncate font-semibold">{getAgendaClientName(job)}</p>
                                 <p className="truncate opacity-80">
@@ -3803,8 +3927,16 @@ function Index() {
                           </div>
                           <button
                             aria-label={`Crear aviso a las ${String(hour).padStart(2, "0")}:00`}
-                            className="border-b px-3 py-3 text-left text-xs text-muted-foreground hover:bg-secondary/30"
+                            className={`border-b px-3 py-3 text-left text-xs text-muted-foreground hover:bg-secondary/30 ${
+                              dragOverAgendaDate === agendaSelectedKey ? "bg-primary/5" : ""
+                            }`}
                             onClick={() => setNewDialog("aviso")}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverAgendaDate(agendaSelectedKey);
+                            }}
+                            onDragLeave={() => setDragOverAgendaDate(null)}
+                            onDrop={(event) => dropJobOnAgendaDate(event, agendaSelectedKey)}
                           />
                         </div>
                       ))}
