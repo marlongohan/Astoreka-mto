@@ -2119,7 +2119,7 @@ function Index() {
           </header>
 
           {isCloudConfigured() ? (
-            <section className="hidden gap-3 rounded-lg border bg-card p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <section className="grid gap-3 rounded-lg border bg-card p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="rounded-md border bg-background p-2">
                   <Cloud className="size-4" />
