@@ -197,13 +197,13 @@ function AstorekaBrandDivider({ className = "" }: { className?: string }) {
 function AstorekaBrandHero({
   className = "",
   logoClassName = "h-20 w-auto sm:h-24",
-  titleClassName = "text-4xl font-black tracking-[0.08em] text-foreground sm:text-5xl",
+  wordmarkClassName = "w-full max-w-none object-contain",
   taglineClassName = "max-w-[28rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
   contentClassName = "items-center text-center",
 }: {
   className?: string;
   logoClassName?: string;
-  titleClassName?: string;
+  wordmarkClassName?: string;
   taglineClassName?: string;
   contentClassName?: string;
 }) {
@@ -215,7 +215,11 @@ function AstorekaBrandHero({
         className={`${logoClassName} shrink-0 object-contain`}
       />
       <div className={`flex min-w-0 flex-1 flex-col justify-center gap-2 ${contentClassName}`.trim()}>
-        <p className={titleClassName}>ASTOREKA</p>
+        <img
+          src={ASTOREKA_WORDMARK_SRC}
+          alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
+          className={wordmarkClassName}
+        />
         <AstorekaBrandDivider className="max-w-[42rem]" />
         <p className={taglineClassName}>{ASTOREKA_TAGLINE}</p>
       </div>
@@ -2254,7 +2258,7 @@ function Index() {
                 <AstorekaBrandHero
                   className="items-start gap-3"
                   logoClassName="h-20 w-auto"
-                  titleClassName="text-3xl font-black tracking-[0.06em] text-sidebar-foreground"
+                  wordmarkClassName="w-full max-w-none object-contain"
                   taglineClassName="max-w-none text-lg font-semibold leading-tight text-sidebar-foreground"
                   contentClassName="items-start text-left"
                 />
@@ -2320,7 +2324,7 @@ function Index() {
                 <AstorekaBrandHero
                   className="justify-center items-center"
                   logoClassName="h-20 w-auto sm:h-24 lg:h-28"
-                  titleClassName="text-4xl font-black tracking-[0.08em] text-foreground sm:text-5xl lg:text-6xl"
+                  wordmarkClassName="w-full max-w-none object-contain"
                   taglineClassName="max-w-[34rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
                   contentClassName="items-center text-center"
                 />
