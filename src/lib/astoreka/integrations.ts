@@ -21,23 +21,47 @@ function getWebhookUrl() {
   return import.meta.env.VITE_N8N_EVENT_WEBHOOK_URL || import.meta.env.VITE_N8N_WEBHOOK_URL || "";
 }
 
+function getWebhookSecret() {
+  return import.meta.env.VITE_N8N_WEBHOOK_SECRET || "";
+}
+
+function readQueue() {
+  if (typeof window === "undefined") {
+    return [] as OperationalEvent[];
+  }
+
+  const existing = window.localStorage.getItem(N8N_QUEUE_KEY);
+  return existing ? (JSON.parse(existing) as OperationalEvent[]) : [];
+}
+
+function writeQueue(queue: OperationalEvent[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(N8N_QUEUE_KEY, JSON.stringify(queue.slice(0, 100)));
+}
+
+function getWebhookHeaders(eventId: string) {
+  const secret = getWebhookSecret();
+
+  return {
+    "content-type": "application/json",
+    "x-astoreka-event-id": eventId,
+    ...(secret ? { "x-astoreka-webhook-secret": secret } : {}),
+  };
+}
+
 function queueEvent(event: OperationalEvent) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const existing = window.localStorage.getItem(N8N_QUEUE_KEY);
-  const queue = existing ? (JSON.parse(existing) as OperationalEvent[]) : [];
-  window.localStorage.setItem(N8N_QUEUE_KEY, JSON.stringify([event, ...queue].slice(0, 100)));
+  writeQueue([event, ...readQueue()]);
 }
 
 export function getQueuedN8nEvents() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  const existing = window.localStorage.getItem(N8N_QUEUE_KEY);
-  return existing ? (JSON.parse(existing) as OperationalEvent[]) : [];
+  return readQueue();
 }
 
 export async function emitOperationalEvent(type: OperationalEventType, job: Job, appData: AppData) {
@@ -63,7 +87,7 @@ export async function emitOperationalEvent(type: OperationalEventType, job: Job,
   try {
     const response = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: getWebhookHeaders(event.id),
       body: JSON.stringify(event),
     });
 
@@ -73,6 +97,38 @@ export async function emitOperationalEvent(type: OperationalEventType, job: Job,
   } catch {
     queueEvent(event);
   }
+}
+
+export async function flushQueuedN8nEvents() {
+  const webhookUrl = getWebhookUrl();
+  const queued = readQueue();
+  if (!webhookUrl || queued.length === 0) {
+    return { delivered: 0, pending: queued.length };
+  }
+
+  const pending: OperationalEvent[] = [];
+  let delivered = 0;
+
+  for (const event of [...queued].reverse()) {
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: getWebhookHeaders(event.id),
+        body: JSON.stringify(event),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook response: ${response.status}`);
+      }
+
+      delivered += 1;
+    } catch {
+      pending.unshift(event);
+    }
+  }
+
+  writeQueue(pending);
+  return { delivered, pending: pending.length };
 }
 
 export function isN8nConfigured() {

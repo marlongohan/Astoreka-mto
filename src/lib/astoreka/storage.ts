@@ -3,6 +3,11 @@ import { emptyEstimateTotals } from "./domain";
 import type { AppData, Job, JobEvent, WorkStatus } from "./types";
 
 const STORAGE_KEY = "astoreka-mto-data-v1";
+const CLOUD_SYNC_META_KEY = "astoreka-mto-cloud-sync-v1";
+
+type CloudSyncMeta = {
+  pendingSince: string;
+};
 
 export function isCloudConfigured() {
   return Boolean(
@@ -34,6 +39,49 @@ export function saveAppData(data: AppData) {
     return;
   }
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function readCloudSyncMeta() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(CLOUD_SYNC_META_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as CloudSyncMeta;
+    return typeof parsed.pendingSince === "string" ? parsed : null;
+  } catch {
+    window.localStorage.removeItem(CLOUD_SYNC_META_KEY);
+    return null;
+  }
+}
+
+export function hasPendingCloudSync() {
+  return Boolean(readCloudSyncMeta());
+}
+
+export function markCloudSyncPending() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const existing = readCloudSyncMeta();
+  const next: CloudSyncMeta = {
+    pendingSince: existing?.pendingSince ?? new Date().toISOString(),
+  };
+  window.localStorage.setItem(CLOUD_SYNC_META_KEY, JSON.stringify(next));
+}
+
+export function clearPendingCloudSync() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(CLOUD_SYNC_META_KEY);
 }
 
 export function createStatusEvent(job: Job, fromStatus: WorkStatus | "", note: string): JobEvent {

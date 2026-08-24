@@ -65,7 +65,6 @@ import {
   emptyEstimateTotals,
   formatCurrency,
   getJobCode,
-  getInvoiceNumber,
   getNextAction,
   getWhatsAppText,
   getWorkGroup,
@@ -79,11 +78,18 @@ import {
   signOutFromCloud,
   type CloudSyncState,
 } from "@/lib/astoreka/cloud-storage";
-import { emitOperationalEvent } from "@/lib/astoreka/integrations";
 import {
+  emitOperationalEvent,
+  flushQueuedN8nEvents,
+  isN8nConfigured,
+} from "@/lib/astoreka/integrations";
+import {
+  clearPendingCloudSync,
   createStatusEvent,
+  hasPendingCloudSync,
   isCloudConfigured,
   loadAppData,
+  markCloudSyncPending,
   saveAppData,
 } from "@/lib/astoreka/storage";
 import type {
@@ -124,7 +130,7 @@ const KANBAN_DROP_STATUS: Record<WorkGroup, WorkStatus> = {
   cierre: "realizado",
   incidencias: "pendiente_pieza",
 };
-const ASTOREKA_LOGO_SRC = "/brand/astoreka-oak-logo.jpg";
+const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-2026.png";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
@@ -276,8 +282,10 @@ function Index() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedJobTab, setSelectedJobTab] = useState("resumen");
   const diagnosisFieldRef = useRef<HTMLTextAreaElement>(null);
+  const dataRef = useRef<AppData>(demoAppData);
   const lastLocalChangeAt = useRef(0);
   const lastCloudUpdateAt = useRef("");
+  const pendingCloudSyncRef = useRef(hasPendingCloudSync());
   const cloudPullBusyRef = useRef(false);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudState, setCloudState] = useState<CloudSyncState>({
@@ -347,9 +355,14 @@ function Index() {
   });
 
   useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
     let active = true;
     const initial = loadAppData();
     setData(initial);
+    dataRef.current = initial;
     if (initial.jobs.length > 0) {
       setSelectedJobId(initial.jobs[0]?.id ?? "");
     }
@@ -379,8 +392,29 @@ function Index() {
           status: "syncing",
           userId: user.id,
           email: user.email ?? "usuario",
-          message: "Cargando datos de Supabase.",
+          message: pendingCloudSyncRef.current
+            ? "Subiendo cambios locales pendientes."
+            : "Cargando datos de Supabase.",
         });
+
+        if (pendingCloudSyncRef.current) {
+          const saved = await saveCloudAppData(initial);
+          lastCloudUpdateAt.current = saved?.updated_at ?? "";
+          pendingCloudSyncRef.current = false;
+          clearPendingCloudSync();
+          if (!active) {
+            return;
+          }
+
+          setCloudState({
+            status: "ready",
+            userId: user.id,
+            email: user.email ?? "usuario",
+            message: "Cambios locales pendientes enviados a Supabase.",
+          });
+          return;
+        }
+
         const snapshot = await loadCloudAppData();
         if (!active) {
           return;
@@ -389,6 +423,7 @@ function Index() {
         if (snapshot) {
           lastCloudUpdateAt.current = snapshot.updated_at;
           saveAppData(snapshot.data);
+          dataRef.current = snapshot.data;
           setData(snapshot.data);
           setSelectedJobId(snapshot.data.jobs[0]?.id ?? "");
         } else {
@@ -698,13 +733,18 @@ function Index() {
   const updateData = (updater: (prev: AppData) => AppData) => {
     setData((prev) => {
       const next = updater(prev);
+      dataRef.current = next;
       lastLocalChangeAt.current = Date.now();
       saveAppData(next);
       if (isCloudConfigured()) {
+        pendingCloudSyncRef.current = true;
+        markCloudSyncPending();
         void saveCloudAppData(next)
           .then((snapshot) => {
             if (snapshot) {
               lastCloudUpdateAt.current = snapshot.updated_at;
+              pendingCloudSyncRef.current = false;
+              clearPendingCloudSync();
               setCloudState({
                 status: "ready",
                 userId: snapshot.owner_id,
@@ -724,8 +764,8 @@ function Index() {
               status: "error",
               message:
                 error instanceof Error
-                  ? error.message
-                  : "Cambios guardados localmente, no en nube.",
+                  ? `Cambios guardados localmente y pendientes de nube: ${error.message}`
+                  : "Cambios guardados localmente y pendientes de nube.",
             });
           });
       }
@@ -753,12 +793,30 @@ function Index() {
         status: "syncing",
         userId: user.id,
         email: user.email ?? "usuario",
-        message: "Sincronizando.",
+        message: pendingCloudSyncRef.current
+          ? "Subiendo cambios locales pendientes."
+          : "Sincronizando.",
       });
+
+      if (pendingCloudSyncRef.current) {
+        const saved = await saveCloudAppData(dataRef.current);
+        lastCloudUpdateAt.current = saved?.updated_at ?? "";
+        pendingCloudSyncRef.current = false;
+        clearPendingCloudSync();
+        setCloudState({
+          status: "ready",
+          userId: user.id,
+          email: user.email ?? "usuario",
+          message: "Cambios locales pendientes enviados a Supabase.",
+        });
+        return;
+      }
+
       const snapshot = await loadCloudAppData();
       if (snapshot) {
         lastCloudUpdateAt.current = snapshot.updated_at;
         saveAppData(snapshot.data);
+        dataRef.current = snapshot.data;
         setData(snapshot.data);
         setSelectedJobId(snapshot.data.jobs[0]?.id ?? "");
       } else {
@@ -792,6 +850,28 @@ function Index() {
 
     cloudPullBusyRef.current = true;
     try {
+      if (pendingCloudSyncRef.current) {
+        const saved = await saveCloudAppData(dataRef.current);
+        if (saved) {
+          lastCloudUpdateAt.current = saved.updated_at;
+          pendingCloudSyncRef.current = false;
+          clearPendingCloudSync();
+          setCloudState({
+            status: "ready",
+            userId: saved.owner_id,
+            email,
+            message: `Cambios locales enviados ${new Date(saved.updated_at).toLocaleTimeString(
+              "es-ES",
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+              },
+            )}.`,
+          });
+        }
+        return;
+      }
+
       const snapshot = await loadCloudAppData();
       if (!snapshot || snapshot.updated_at === lastCloudUpdateAt.current) {
         return;
@@ -799,6 +879,7 @@ function Index() {
 
       lastCloudUpdateAt.current = snapshot.updated_at;
       saveAppData(snapshot.data);
+      dataRef.current = snapshot.data;
       setData(snapshot.data);
       setSelectedJobId((current) =>
         snapshot.data.jobs.some((job) => job.id === current)
@@ -1129,10 +1210,11 @@ function Index() {
     setNewDialog("");
   };
 
-  const buildInvoiceForJob = (job: (typeof data.jobs)[number], invoiceCount: number): Invoice => ({
+  const buildInvoiceForJob = (job: (typeof data.jobs)[number], _invoiceCount: number): Invoice => ({
     id: `inv-${job.id}-${Date.now()}`,
     jobId: job.id,
-    invoiceNumber: getInvoiceNumber(invoiceCount + 1),
+    invoiceNumber: `FAC-${new Date().getFullYear()}-${job.code}`,
+    lines: getEstimateLinesForJob(job),
     subtotal: job.totals.subtotal,
     vat: job.totals.vat,
     total: job.totals.total,
@@ -1484,24 +1566,13 @@ function Index() {
         };
       }
 
-      const invoices = prev.invoices.map((invoice) =>
-        invoice.jobId === jobId
-          ? {
-              ...invoice,
-              subtotal: updatedJob.totals.subtotal,
-              vat: updatedJob.totals.vat,
-              total: updatedJob.totals.total,
-            }
-          : invoice,
-      );
-
       return {
         ...prev,
         jobs: prev.jobs.map((job) => (job.id === jobId ? updatedJob : job)),
         estimates: shouldRecalculateTotals(updatedJob)
           ? syncEstimateForJob(prev.estimates, updatedJob)
           : prev.estimates,
-        invoices,
+        invoices: prev.invoices,
       };
     });
   };
@@ -1675,7 +1746,17 @@ function Index() {
       return;
     }
     const client = job.clientId ? clientsById.get(job.clientId) : undefined;
-    const text = getWhatsAppText(type, job, client);
+    const invoice = invoicesByJob.get(job.id);
+    const totals =
+      (type === "factura" || type === "cobro") && invoice
+        ? {
+            ...job.totals,
+            subtotal: invoice.subtotal,
+            vat: invoice.vat,
+            total: invoice.total,
+          }
+        : job.totals;
+    const text = getWhatsAppText(type, job, client, totals);
     let chatOpened = false;
 
     if (openChat && typeof window !== "undefined") {
@@ -1704,9 +1785,19 @@ function Index() {
       return undefined;
     }
     const client = job.clientId ? clientsById.get(job.clientId) : undefined;
+    const invoice = invoicesByJob.get(job.id);
     const phone = client?.phone.replace(/\D/g, "");
     const normalizedPhone = phone?.length === 9 ? `34${phone}` : phone;
-    const text = getWhatsAppText(type, job, client);
+    const totals =
+      (type === "factura" || type === "cobro") && invoice
+        ? {
+            ...job.totals,
+            subtotal: invoice.subtotal,
+            vat: invoice.vat,
+            total: invoice.total,
+          }
+        : job.totals;
+    const text = getWhatsAppText(type, job, client, totals);
     return normalizedPhone
       ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(text)}`
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -1739,16 +1830,42 @@ function Index() {
       kind === "factura"
         ? `Factura ${invoice?.invoiceNumber ?? job.code}`
         : `Presupuesto ${job.code}`;
-    const lines = [
-      [getLaborDescription(job), String(getLaborQty(job)), formatCurrency(job.totals.labor)],
-      ["Salida", "1", formatCurrency(job.totals.callOut)],
-      ["Kilometraje", "1", formatCurrency(job.totals.kmCost)],
-      ...job.plannedMaterials.map((line) => [
-        line.name,
+    const printableLines =
+      kind === "factura" && invoice?.lines?.length
+        ? invoice.lines
+        : [
+            {
+              description: getLaborDescription(job),
+              qty: getLaborQty(job),
+              unitPrice: getLaborQty(job) > 0 ? job.totals.labor / getLaborQty(job) : 0,
+            },
+            { description: "Salida", qty: 1, unitPrice: job.totals.callOut },
+            { description: "Kilometraje", qty: 1, unitPrice: job.totals.kmCost },
+            ...job.plannedMaterials.map((line) => ({
+              description: line.name,
+              qty: line.qty,
+              unitPrice: line.salePrice,
+            })),
+          ];
+    const lines = printableLines
+      .map((line) => [
+        line.description,
         String(line.qty),
-        formatCurrency(line.qty * line.salePrice),
-      ]),
-    ].filter(([, , amount]) => amount !== formatCurrency(0));
+        formatCurrency(line.qty * line.unitPrice),
+      ])
+      .filter(([, , amount]) => amount !== formatCurrency(0));
+    const printableTotals =
+      kind === "factura" && invoice
+        ? {
+            subtotal: invoice.subtotal,
+            vat: invoice.vat,
+            total: invoice.total,
+          }
+        : {
+            subtotal: job.totals.subtotal,
+            vat: job.totals.vat,
+            total: job.totals.total,
+          };
 
     const html = `<!doctype html>
 <html lang="es">
@@ -1814,9 +1931,9 @@ function Index() {
     </tbody>
   </table>
   <section class="totals">
-    <div><span>Subtotal</span><strong>${formatCurrency(job.totals.subtotal)}</strong></div>
-    <div><span>IVA 21%</span><strong>${formatCurrency(job.totals.vat)}</strong></div>
-    <div class="total"><span>Total</span><span>${formatCurrency(job.totals.total)}</span></div>
+    <div><span>Subtotal</span><strong>${formatCurrency(printableTotals.subtotal)}</strong></div>
+    <div><span>IVA 21%</span><strong>${formatCurrency(printableTotals.vat)}</strong></div>
+    <div class="total"><span>Total</span><span>${formatCurrency(printableTotals.total)}</span></div>
   </section>
   <h2>Notas</h2>
   <p>${escapeHtml(job.notesClient || job.description || (kind === "factura" ? "Factura emitida por trabajos realizados." : "Presupuesto sujeto a validación final tras revisión técnica."))}</p>
@@ -1893,6 +2010,31 @@ function Index() {
   const currentInvoiceWhatsAppHref = selectedJob
     ? getWhatsAppHref(selectedJob.id, "factura")
     : undefined;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isN8nConfigured()) {
+      return;
+    }
+
+    let active = true;
+    const flush = () => {
+      if (!active) {
+        return;
+      }
+
+      void flushQueuedN8nEvents().catch(() => undefined);
+    };
+
+    flush();
+    window.addEventListener("online", flush);
+    window.addEventListener("focus", flush);
+
+    return () => {
+      active = false;
+      window.removeEventListener("online", flush);
+      window.removeEventListener("focus", flush);
+    };
+  }, []);
 
   const getSelectedOrFirstActiveJob = () =>
     selectedJob ??

@@ -175,16 +175,6 @@ async function saveCloudRecords(userId: string, data: AppData): Promise<CloudSna
     return null;
   }
 
-  const { error: deleteError } = await supabase
-    .from("astoreka_records")
-    .delete()
-    .eq("owner_id", userId)
-    .neq("sync_token", syncToken);
-
-  if (deleteError) {
-    return null;
-  }
-
   return {
     owner_id: userId,
     data,

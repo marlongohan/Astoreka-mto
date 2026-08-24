@@ -167,6 +167,7 @@ export interface Invoice {
   id: string;
   jobId: string;
   invoiceNumber: string;
+  lines?: Array<{ description: string; qty: number; unitPrice: number }>;
   subtotal: number;
   vat: number;
   total: number;

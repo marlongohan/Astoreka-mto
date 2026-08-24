@@ -76,6 +76,13 @@ Configurar en la app como:
 
 \`\`\`env
 VITE_N8N_WEBHOOK_URL=https://TU-N8N/webhook/astoreka/evento
+VITE_N8N_WEBHOOK_SECRET=un-secreto-compartido-largo
+\`\`\`
+
+Y en n8n definir:
+
+\`\`\`env
+ASTOREKA_WEBHOOK_SECRET=un-secreto-compartido-largo
 \`\`\`
 
 Eventos que emite la app:
@@ -87,3 +94,5 @@ Eventos que emite la app:
 - `invoice_collected`
 
 Si `VITE_N8N_WEBHOOK_URL` no existe o falla la llamada, la app no se bloquea: guarda el evento en una cola local para no perder la operación principal.
+
+El workflow `04_eventos_operativos_webhook.json` ahora rechaza peticiones sin el header `x-astoreka-webhook-secret` correcto y responde con código HTTP 401/503 si falta validación. Sigue siendo una protección de secreto compartido; para firma fuerte o HMAC hay que mover la validación a un backend propio o proxy de confianza.

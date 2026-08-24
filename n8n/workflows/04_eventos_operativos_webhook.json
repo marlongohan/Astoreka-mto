@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || {};\nconst eventType = body.type || 'unknown';\nconst job = body.job || {};\nconst clients = body.appData?.clients || [];\nconst assets = body.appData?.assets || [];\nconst invoices = body.appData?.invoices || [];\nconst estimates = body.appData?.estimates || [];\nconst client = clients.find(item => item.id === job.clientId) || null;\nconst asset = assets.find(item => item.id === job.assetId) || null;\nconst invoice = invoices.find(item => item.jobId === job.id) || null;\nconst estimate = estimates.find(item => item.jobId === job.id) || null;\nconst nextAction = {\n  job_created: 'Registrar aviso y avisar a oficina si es urgente',\n  estimate_created: 'Enviar presupuesto al cliente y programar seguimiento',\n  job_status_changed: 'Registrar cambio de estado en historial externo',\n  invoice_created: 'Programar seguimiento de cobro',\n  invoice_collected: 'Cerrar cobro y actualizar resumen diario'\n}[eventType] || 'Revisar evento manualmente';\nreturn [{ json: { ok: true, eventType, receivedAt: new Date().toISOString(), job: { id: job.id, code: job.code, status: job.status, priority: job.priority, symptoms: job.symptoms, total: job.totals?.total || 0 }, client, asset, invoice, estimate, nextAction } }];"
+        "jsCode": "const payload = $input.first().json || {};\nconst body = payload.body || {};\nconst headers = payload.headers || {};\nconst sharedSecret = $env.ASTOREKA_WEBHOOK_SECRET || '';\nconst receivedSecret = headers['x-astoreka-webhook-secret'] || headers['X-Astoreka-Webhook-Secret'] || '';\nconst eventId = headers['x-astoreka-event-id'] || headers['X-Astoreka-Event-Id'] || body.id || '';\n\nif (!sharedSecret) {\n  return [{ json: { ok: false, statusCode: 503, error: 'missing_shared_secret', message: 'Configura ASTOREKA_WEBHOOK_SECRET en n8n antes de activar este workflow.' } }];\n}\n\nif (receivedSecret !== sharedSecret) {\n  return [{ json: { ok: false, statusCode: 401, error: 'invalid_shared_secret', message: 'Secreto no valido.' } }];\n}\n\nconst eventType = body.type || 'unknown';\nconst job = body.job || {};\nconst clients = body.appData?.clients || [];\nconst assets = body.appData?.assets || [];\nconst invoices = body.appData?.invoices || [];\nconst estimates = body.appData?.estimates || [];\nconst client = clients.find(item => item.id === job.clientId) || null;\nconst asset = assets.find(item => item.id === job.assetId) || null;\nconst invoice = invoices.find(item => item.jobId === job.id) || null;\nconst estimate = estimates.find(item => item.jobId === job.id) || null;\nconst nextAction = {\n  job_created: 'Registrar aviso y avisar a oficina si es urgente',\n  estimate_created: 'Enviar presupuesto al cliente y programar seguimiento',\n  job_status_changed: 'Registrar cambio de estado en historial externo',\n  invoice_created: 'Programar seguimiento de cobro',\n  invoice_collected: 'Cerrar cobro y actualizar resumen diario'\n}[eventType] || 'Revisar evento manualmente';\nreturn [{ json: { ok: true, statusCode: 200, eventId, eventType, receivedAt: new Date().toISOString(), job: { id: job.id, code: job.code, status: job.status, priority: job.priority, symptoms: job.symptoms, total: job.totals?.total || 0 }, client, asset, invoice, estimate, nextAction } }];"
       },
       "id": "code-normalizar-evento",
       "name": "Normalizar evento",
@@ -37,7 +37,10 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{$json}}"
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": "={{$json.statusCode || 200}}"
+        }
       },
       "id": "respond-evento-astoreka",
       "name": "Responder evento",
