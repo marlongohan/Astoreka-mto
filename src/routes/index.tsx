@@ -22,6 +22,7 @@ import {
   TriangleAlert,
   Users,
   Wrench,
+  Zap,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +133,7 @@ const KANBAN_DROP_STATUS: Record<WorkGroup, WorkStatus> = {
 };
 const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-2026.png";
 const ASTOREKA_WORDMARK_SRC = "/brand/astoreka-wordmark-2026.png";
+const ASTOREKA_TAGLINE = "Etxeko eta etxetresnen konponketa elektrikoak";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
@@ -178,6 +180,47 @@ function AstorekaBrand({
         alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
         className={`${wordmarkClassName} object-contain object-left`}
       />
+    </div>
+  );
+}
+
+function AstorekaBrandDivider({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex w-full items-center gap-3 text-[#f97316] ${className}`.trim()}>
+      <div className="h-0.5 flex-1 rounded-full bg-current/80" />
+      <Zap className="size-5 shrink-0 fill-current stroke-current" />
+      <div className="h-0.5 flex-1 rounded-full bg-current/80" />
+    </div>
+  );
+}
+
+function AstorekaBrandHero({
+  className = "",
+  logoClassName = "h-20 w-auto sm:h-24",
+  wordmarkClassName = "h-10 w-full sm:h-14",
+  taglineClassName = "max-w-[28rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
+}: {
+  className?: string;
+  logoClassName?: string;
+  wordmarkClassName?: string;
+  taglineClassName?: string;
+}) {
+  return (
+    <div className={`flex w-full min-w-0 items-center gap-4 ${className}`.trim()}>
+      <img
+        src={ASTOREKA_LOGO_SRC}
+        alt="Astoreka"
+        className={`${logoClassName} shrink-0 object-contain`}
+      />
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+        <img
+          src={ASTOREKA_WORDMARK_SRC}
+          alt="Astoreka"
+          className={`${wordmarkClassName} w-full object-contain object-left`}
+        />
+        <AstorekaBrandDivider />
+        <p className={taglineClassName}>{ASTOREKA_TAGLINE}</p>
+      </div>
     </div>
   );
 }
@@ -2196,13 +2239,15 @@ function Index() {
                 className="block w-full border-0 bg-transparent p-0 text-left outline-none"
                 onClick={() => void refreshFromLogo()}
               >
-                <AstorekaBrand
-                  logoClassName="h-16 w-auto"
-                  wordmarkClassName="h-11 min-w-0 flex-1 w-full"
+                <AstorekaBrandHero
+                  className="items-start gap-3"
+                  logoClassName="h-20 w-auto"
+                  wordmarkClassName="h-12 w-full"
+                  taglineClassName="max-w-none text-lg font-semibold leading-tight text-sidebar-foreground"
                 />
               </button>
-              <p className="mt-2 text-xs font-medium uppercase text-sidebar-foreground/55">
-                Gestión SAT
+              <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-sidebar-foreground/55">
+                Centro operativo SAT
               </p>
             </div>
 
@@ -2252,20 +2297,22 @@ function Index() {
         </aside>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <header className="rounded-lg border bg-card p-4 shadow-sm lg:p-5">
+          <header className="rounded-[1.75rem] border border-border/70 bg-[radial-gradient(circle_at_top,#ffffff_0%,#fffaf4_38%,#ffffff_100%)] p-4 shadow-sm lg:p-6">
             <div className="min-w-0">
               <button
                 aria-label="Actualizar Astoreka"
-                className="mb-3 block border-0 bg-transparent p-0 text-left outline-none lg:hidden"
+                className="mb-4 block w-full border-0 bg-transparent p-0 text-left outline-none"
                 onClick={() => void refreshFromLogo()}
               >
-                <AstorekaBrand
-                  logoClassName="h-14 w-auto"
-                  wordmarkClassName="h-10 min-w-0 flex-1 w-full"
+                <AstorekaBrandHero
+                  className="items-center"
+                  logoClassName="h-20 w-auto sm:h-24 lg:h-28"
+                  wordmarkClassName="h-12 w-full sm:h-16 lg:h-20"
+                  taglineClassName="max-w-[34rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
                 />
               </button>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#f97316]/20 pt-4">
+                <h1 className="text-xl font-semibold tracking-normal text-foreground sm:text-2xl">
                   Centro operativo
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">
