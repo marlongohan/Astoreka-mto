@@ -131,6 +131,7 @@ const KANBAN_DROP_STATUS: Record<WorkGroup, WorkStatus> = {
   incidencias: "pendiente_pieza",
 };
 const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-2026.png";
+const ASTOREKA_WORDMARK_SRC = "/brand/astoreka-wordmark-2026.png";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
   pendiente_datos: "border-slate-300 bg-slate-100 text-slate-700",
@@ -154,6 +155,31 @@ const STATUS_CLASS: Record<WorkStatus, string> = {
 
 function formatStatusLabel(status: WorkStatus) {
   return status.replaceAll("_", " ");
+}
+
+function AstorekaBrand({
+  className = "",
+  logoClassName = "h-14 w-auto",
+  wordmarkClassName = "h-10 w-auto max-w-[220px]",
+}: {
+  className?: string;
+  logoClassName?: string;
+  wordmarkClassName?: string;
+}) {
+  return (
+    <div className={`flex min-w-0 items-center gap-3 ${className}`.trim()}>
+      <img
+        src={ASTOREKA_LOGO_SRC}
+        alt="Astoreka"
+        className={`${logoClassName} shrink-0 object-contain`}
+      />
+      <img
+        src={ASTOREKA_WORDMARK_SRC}
+        alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
+        className={`${wordmarkClassName} min-w-0 object-contain`}
+      />
+    </div>
+  );
 }
 
 type AgendaView = "dia" | "semana" | "mes" | "horas";
@@ -1880,8 +1906,9 @@ function Index() {
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
     h1 { margin: 0; font-size: 28px; }
     h2 { margin: 26px 0 10px; font-size: 16px; }
-    .brand { display: flex; align-items: center; gap: 18px; }
-    .brand-logo { width: 92px; height: auto; display: block; }
+    .brand { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .brand-logo { width: 92px; height: auto; display: block; flex: 0 0 auto; }
+    .brand-wordmark { width: min(330px, 100%); height: auto; display: block; }
     .muted { color: #5f6f75; }
     .box { border: 1px solid #d7e2e4; border-radius: 8px; padding: 14px; margin: 12px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -1901,10 +1928,11 @@ function Index() {
   <header>
     <div class="brand">
       <img class="brand-logo" src="${ASTOREKA_LOGO_SRC}" alt="Astoreka" />
-      <div>
-        <h1>Astoreka MTO</h1>
-        <p class="muted">Mantenimiento técnico operativo</p>
-      </div>
+      <img
+        class="brand-wordmark"
+        src="${ASTOREKA_WORDMARK_SRC}"
+        alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
+      />
     </div>
     <div>
       <strong>${escapeHtml(title)}</strong><br />
@@ -2165,13 +2193,12 @@ function Index() {
             <div className="border-b border-sidebar-border/70 pb-5">
               <button
                 aria-label="Actualizar Astoreka"
-                className="block border-0 bg-transparent p-0 text-left outline-none"
+                className="block w-full border-0 bg-transparent p-0 text-left outline-none"
                 onClick={() => void refreshFromLogo()}
               >
-                <img
-                  src={ASTOREKA_LOGO_SRC}
-                  alt="Astoreka"
-                  className="h-16 w-auto object-contain"
+                <AstorekaBrand
+                  logoClassName="h-16 w-auto"
+                  wordmarkClassName="h-11 w-auto max-w-[150px]"
                 />
               </button>
               <p className="mt-2 text-xs font-medium uppercase text-sidebar-foreground/55">
@@ -2232,10 +2259,9 @@ function Index() {
                 className="mb-3 block border-0 bg-transparent p-0 text-left outline-none lg:hidden"
                 onClick={() => void refreshFromLogo()}
               >
-                <img
-                  src={ASTOREKA_LOGO_SRC}
-                  alt="Astoreka MTO"
-                  className="h-14 w-auto object-contain"
+                <AstorekaBrand
+                  logoClassName="h-14 w-auto"
+                  wordmarkClassName="h-10 w-auto max-w-[220px]"
                 />
               </button>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
