@@ -197,13 +197,15 @@ function AstorekaBrandDivider({ className = "" }: { className?: string }) {
 function AstorekaBrandHero({
   className = "",
   logoClassName = "h-20 w-auto sm:h-24",
-  wordmarkClassName = "h-10 w-full sm:h-14",
+  titleClassName = "text-4xl font-black tracking-[0.08em] text-foreground sm:text-5xl",
   taglineClassName = "max-w-[28rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
+  contentClassName = "items-center text-center",
 }: {
   className?: string;
   logoClassName?: string;
-  wordmarkClassName?: string;
+  titleClassName?: string;
   taglineClassName?: string;
+  contentClassName?: string;
 }) {
   return (
     <div className={`flex w-full min-w-0 items-center gap-4 ${className}`.trim()}>
@@ -212,13 +214,9 @@ function AstorekaBrandHero({
         alt="Astoreka"
         className={`${logoClassName} shrink-0 object-contain`}
       />
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-        <img
-          src={ASTOREKA_WORDMARK_SRC}
-          alt="Astoreka"
-          className={`${wordmarkClassName} w-full object-contain object-left`}
-        />
-        <AstorekaBrandDivider />
+      <div className={`flex min-w-0 flex-1 flex-col justify-center gap-2 ${contentClassName}`.trim()}>
+        <p className={titleClassName}>ASTOREKA</p>
+        <AstorekaBrandDivider className="max-w-[42rem]" />
         <p className={taglineClassName}>{ASTOREKA_TAGLINE}</p>
       </div>
     </div>
@@ -2242,8 +2240,9 @@ function Index() {
                 <AstorekaBrandHero
                   className="items-start gap-3"
                   logoClassName="h-20 w-auto"
-                  wordmarkClassName="h-12 w-full"
+                  titleClassName="text-3xl font-black tracking-[0.06em] text-sidebar-foreground"
                   taglineClassName="max-w-none text-lg font-semibold leading-tight text-sidebar-foreground"
+                  contentClassName="items-start text-left"
                 />
               </button>
               <p className="mt-3 text-xs font-medium uppercase tracking-[0.18em] text-sidebar-foreground/55">
@@ -2305,10 +2304,11 @@ function Index() {
                 onClick={() => void refreshFromLogo()}
               >
                 <AstorekaBrandHero
-                  className="items-center"
+                  className="justify-center items-center"
                   logoClassName="h-20 w-auto sm:h-24 lg:h-28"
-                  wordmarkClassName="h-12 w-full sm:h-16 lg:h-20"
+                  titleClassName="text-4xl font-black tracking-[0.08em] text-foreground sm:text-5xl lg:text-6xl"
                   taglineClassName="max-w-[34rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
+                  contentClassName="items-center text-center"
                 />
               </button>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#f97316]/20 pt-4">
