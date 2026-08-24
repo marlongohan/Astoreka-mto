@@ -2183,7 +2183,7 @@ function Index() {
                   />
                   <Button size="sm" type="submit" disabled={cloudBusy}>
                     <LogIn />
-                    Entrar / crear
+                    Entrar
                   </Button>
                 </form>
               )}

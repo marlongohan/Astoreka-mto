@@ -53,13 +53,8 @@ export async function signInToCloud(email: string, password: string) {
   const credentials = { email: email.trim(), password };
   const { error } = await supabase.auth.signInWithPassword(credentials);
 
-  if (!error) {
-    return;
-  }
-
-  const signUpResult = await supabase.auth.signUp(credentials);
-  if (signUpResult.error) {
-    throw signUpResult.error;
+  if (error) {
+    throw error;
   }
 }
 

@@ -10,6 +10,7 @@ type OperationalEventType =
   | "invoice_collected";
 
 interface OperationalEvent {
+  id: string;
   type: OperationalEventType;
   job: Job;
   appData: Pick<AppData, "clients" | "assets" | "invoices" | "estimates">;
@@ -41,6 +42,7 @@ export function getQueuedN8nEvents() {
 
 export async function emitOperationalEvent(type: OperationalEventType, job: Job, appData: AppData) {
   const event: OperationalEvent = {
+    id: crypto.randomUUID(),
     type,
     job,
     appData: {
@@ -59,11 +61,15 @@ export async function emitOperationalEvent(type: OperationalEventType, job: Job,
   }
 
   try {
-    await fetch(webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(event),
     });
+
+    if (!response.ok) {
+      throw new Error(`Webhook response: ${response.status}`);
+    }
   } catch {
     queueEvent(event);
   }
