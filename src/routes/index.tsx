@@ -1949,7 +1949,13 @@ function Index() {
     h2 { margin: 26px 0 10px; font-size: 16px; }
     .brand { display: flex; align-items: center; gap: 18px; min-width: 0; flex: 1 1 auto; }
     .brand-logo { width: 92px; height: auto; display: block; flex: 0 0 auto; }
-    .brand-wordmark { width: 100%; max-width: none; height: auto; display: block; flex: 1 1 auto; object-fit: contain; object-position: left center; }
+    .brand-copy { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+    .brand-wordmark { width: 100%; max-width: none; height: auto; display: block; flex: 1 1 auto; object-fit: contain; object-position: center; }
+    .brand-divider { display: flex; width: 100%; align-items: center; gap: 12px; color: #f97316; }
+    .brand-divider-line { height: 2px; flex: 1 1 auto; border-radius: 999px; background: currentColor; opacity: 0.8; }
+    .brand-divider-icon { font-size: 18px; line-height: 1; }
+    .brand-tagline { margin: 0; color: #18252b; font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .document-meta { text-align: right; }
     .muted { color: #5f6f75; }
     .box { border: 1px solid #d7e2e4; border-radius: 8px; padding: 14px; margin: 12px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -1969,13 +1975,21 @@ function Index() {
   <header>
     <div class="brand">
       <img class="brand-logo" src="${ASTOREKA_LOGO_SRC}" alt="Astoreka" />
-      <img
-        class="brand-wordmark"
-        src="${ASTOREKA_WORDMARK_SRC}"
-        alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
-      />
+      <div class="brand-copy">
+        <img
+          class="brand-wordmark"
+          src="${ASTOREKA_WORDMARK_SRC}"
+          alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
+        />
+        <div class="brand-divider">
+          <div class="brand-divider-line"></div>
+          <div class="brand-divider-icon">⚡</div>
+          <div class="brand-divider-line"></div>
+        </div>
+        <p class="brand-tagline">${escapeHtml(ASTOREKA_TAGLINE)}</p>
+      </div>
     </div>
-    <div>
+    <div class="document-meta">
       <strong>${escapeHtml(title)}</strong><br />
       <span class="muted">${new Date().toLocaleDateString("es-ES")}</span>
     </div>
