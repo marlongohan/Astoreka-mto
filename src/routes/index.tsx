@@ -160,14 +160,14 @@ function formatStatusLabel(status: WorkStatus) {
 function AstorekaBrand({
   className = "",
   logoClassName = "h-14 w-auto",
-  wordmarkClassName = "h-10 w-auto max-w-[220px]",
+  wordmarkClassName = "h-10 min-w-0 flex-1 w-full",
 }: {
   className?: string;
   logoClassName?: string;
   wordmarkClassName?: string;
 }) {
   return (
-    <div className={`flex min-w-0 items-center gap-3 ${className}`.trim()}>
+    <div className={`flex w-full min-w-0 items-center gap-3 ${className}`.trim()}>
       <img
         src={ASTOREKA_LOGO_SRC}
         alt="Astoreka"
@@ -176,7 +176,7 @@ function AstorekaBrand({
       <img
         src={ASTOREKA_WORDMARK_SRC}
         alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
-        className={`${wordmarkClassName} min-w-0 object-contain`}
+        className={`${wordmarkClassName} object-contain object-left`}
       />
     </div>
   );
@@ -1906,9 +1906,9 @@ function Index() {
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 2px solid #0f766e; padding-bottom: 18px; margin-bottom: 28px; }
     h1 { margin: 0; font-size: 28px; }
     h2 { margin: 26px 0 10px; font-size: 16px; }
-    .brand { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .brand { display: flex; align-items: center; gap: 18px; min-width: 0; flex: 1 1 auto; }
     .brand-logo { width: 92px; height: auto; display: block; flex: 0 0 auto; }
-    .brand-wordmark { width: min(330px, 100%); height: auto; display: block; }
+    .brand-wordmark { width: 100%; max-width: none; height: auto; display: block; flex: 1 1 auto; object-fit: contain; object-position: left center; }
     .muted { color: #5f6f75; }
     .box { border: 1px solid #d7e2e4; border-radius: 8px; padding: 14px; margin: 12px 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -2198,7 +2198,7 @@ function Index() {
               >
                 <AstorekaBrand
                   logoClassName="h-16 w-auto"
-                  wordmarkClassName="h-11 w-auto max-w-[150px]"
+                  wordmarkClassName="h-11 min-w-0 flex-1 w-full"
                 />
               </button>
               <p className="mt-2 text-xs font-medium uppercase text-sidebar-foreground/55">
@@ -2261,7 +2261,7 @@ function Index() {
               >
                 <AstorekaBrand
                   logoClassName="h-14 w-auto"
-                  wordmarkClassName="h-10 w-auto max-w-[220px]"
+                  wordmarkClassName="h-10 min-w-0 flex-1 w-full"
                 />
               </button>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
