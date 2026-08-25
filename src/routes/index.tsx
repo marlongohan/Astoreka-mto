@@ -196,9 +196,9 @@ function AstorekaBrandDivider({ className = "" }: { className?: string }) {
 
 function AstorekaBrandHero({
   className = "",
-  logoClassName = "h-20 w-auto sm:h-24",
-  wordmarkClassName = "w-full max-w-none object-contain",
-  taglineClassName = "max-w-[28rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
+  logoClassName = "h-24 w-auto sm:h-28 lg:h-32",
+  wordmarkClassName = "h-auto w-full max-w-[42rem] object-contain",
+  taglineClassName = "max-w-[34rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
   contentClassName = "items-center text-center",
 }: {
   className?: string;
@@ -208,7 +208,7 @@ function AstorekaBrandHero({
   contentClassName?: string;
 }) {
   return (
-    <div className={`flex w-full min-w-0 items-center gap-4 ${className}`.trim()}>
+    <div className={`flex w-full min-w-0 items-center gap-4 sm:gap-6 ${className}`.trim()}>
       <img
         src={ASTOREKA_LOGO_SRC}
         alt="Astoreka"
@@ -220,7 +220,7 @@ function AstorekaBrandHero({
           alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
           className={wordmarkClassName}
         />
-        <AstorekaBrandDivider className="max-w-[42rem]" />
+        <AstorekaBrandDivider className="w-full max-w-[42rem]" />
         <p className={taglineClassName}>{ASTOREKA_TAGLINE}</p>
       </div>
     </div>
@@ -2322,10 +2322,10 @@ function Index() {
                 onClick={() => void refreshFromLogo()}
               >
                 <AstorekaBrandHero
-                  className="justify-center items-center"
-                  logoClassName="h-20 w-auto sm:h-24 lg:h-28"
-                  wordmarkClassName="w-full max-w-none object-contain"
-                  taglineClassName="max-w-[34rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
+                  className="justify-center"
+                  logoClassName="h-24 w-auto sm:h-28 lg:h-32"
+                  wordmarkClassName="h-auto w-full max-w-[44rem] object-contain"
+                  taglineClassName="max-w-[38rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
                   contentClassName="items-center text-center"
                 />
               </button>
