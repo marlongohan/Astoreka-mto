@@ -133,6 +133,7 @@ const KANBAN_DROP_STATUS: Record<WorkGroup, WorkStatus> = {
 };
 const ASTOREKA_LOGO_SRC = "/brand/astoreka-logo-2026.png";
 const ASTOREKA_WORDMARK_SRC = "/brand/astoreka-wordmark-2026.png";
+const ASTOREKA_APP_HEADER_SRC = "/brand/astoreka-app-header-2026.png";
 const ASTOREKA_TAGLINE = "Etxeko eta etxetresnen konponketa elektrikoak";
 
 const STATUS_CLASS: Record<WorkStatus, string> = {
@@ -197,30 +198,36 @@ function AstorekaBrandDivider({ className = "" }: { className?: string }) {
 function AstorekaBrandHero({
   className = "",
   logoClassName = "h-24 w-auto sm:h-28 lg:h-32",
+  logoFrameClassName = "",
   wordmarkClassName = "h-auto w-full max-w-[42rem] object-contain",
   taglineClassName = "max-w-[34rem] text-base font-semibold leading-tight text-foreground sm:text-2xl",
   contentClassName = "items-center text-center",
+  dividerClassName = "w-full max-w-[42rem]",
 }: {
   className?: string;
   logoClassName?: string;
+  logoFrameClassName?: string;
   wordmarkClassName?: string;
   taglineClassName?: string;
   contentClassName?: string;
+  dividerClassName?: string;
 }) {
   return (
     <div className={`flex w-full min-w-0 items-center gap-4 sm:gap-6 ${className}`.trim()}>
-      <img
-        src={ASTOREKA_LOGO_SRC}
-        alt="Astoreka"
-        className={`${logoClassName} shrink-0 object-contain`}
-      />
+      <div className={`${logoFrameClassName}`.trim()}>
+        <img
+          src={ASTOREKA_LOGO_SRC}
+          alt="Astoreka"
+          className={`${logoClassName} shrink-0 object-contain`}
+        />
+      </div>
       <div className={`flex min-w-0 flex-1 flex-col justify-center gap-2 ${contentClassName}`.trim()}>
         <img
           src={ASTOREKA_WORDMARK_SRC}
           alt="Astoreka · Konponketa elektrikoak eta etxetresna elektrikoak"
           className={wordmarkClassName}
         />
-        <AstorekaBrandDivider className="w-full max-w-[42rem]" />
+        <AstorekaBrandDivider className={dividerClassName} />
         <p className={taglineClassName}>{ASTOREKA_TAGLINE}</p>
       </div>
     </div>
@@ -2321,12 +2328,10 @@ function Index() {
                 className="mb-4 block w-full border-0 bg-transparent p-0 text-left outline-none"
                 onClick={() => void refreshFromLogo()}
               >
-                <AstorekaBrandHero
-                  className="justify-center"
-                  logoClassName="h-24 w-auto sm:h-28 lg:h-32"
-                  wordmarkClassName="h-auto w-full max-w-[44rem] object-contain"
-                  taglineClassName="max-w-[38rem] text-lg font-semibold leading-tight text-foreground sm:text-2xl"
-                  contentClassName="items-center text-center"
+                <img
+                  src={ASTOREKA_APP_HEADER_SRC}
+                  alt="Astoreka"
+                  className="w-full rounded-2xl object-contain"
                 />
               </button>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[#f97316]/20 pt-4">
